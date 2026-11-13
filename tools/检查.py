@@ -35,9 +35,31 @@ STATUSES = ("草稿", "待核", "成稿")
 # 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
 # 法宝按品阶分，人物按层级分；其余类型仍是一层目录。
 TIERS = {
-    "法宝": ("品阶", ("混沌至宝", "先天灵宝", "准先天", "后天灵宝")),
+    "法宝": ("品阶", ("混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝")),
     "人物": ("层级", ("混沌", "圣人", "准圣", "大罗金仙", "太乙玄仙", "金仙")),
 }
+
+# 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13）：
+#   系列 = 混沌 > 先天 > 后天（混沌是特殊的先天，只有盘古与混沌魔神才有）
+#   禁制 1-12 下品灵宝 / 13-24 中品 / 25-36 上品 / 37-48 极品 / 49 至宝
+SERIES_OF_TIER = {
+    "混沌至宝": "混沌", "混沌灵宝": "混沌",
+    "先天至宝": "先天", "先天灵宝": "先天",
+    "后天至宝": "后天", "后天灵宝": "后天",
+}
+GRADE_BANDS = ((1, 12, "下品"), (13, 24, "中品"), (25, 36, "上品"), (37, 48, "极品"))
+GRADES = tuple(g for _, _, g in GRADE_BANDS) + ("至宝",)
+EXEMPT_TAG = "分类条目"
+
+
+def grade_of(num):
+    """禁制道数 → 品级；越界返回 None。"""
+    if num == 49:
+        return "至宝"
+    for lo, hi, grade in GRADE_BANDS:
+        if lo <= num <= hi:
+            return grade
+    return None
 
 # 允许放在库根、不受「目录=类型」约束的文件
 ROOT_OK = {"索引.md"}
@@ -176,6 +198,45 @@ def main() -> int:
                         )
             elif depth > 2:
                 errors.append(f"{rel}: 「{top}」不设子目录，请直接放在 {top}\\{path.name}")
+
+        # 法宝：系列 / 禁制 / 品级 三者必须自洽（分类条目页豁免）
+        if kind == "法宝" and EXEMPT_TAG not in fm.get("标签", ""):
+            tier = fm.get("品阶", "").strip()
+            series = fm.get("系列", "").strip()
+            grade = fm.get("品级", "").strip()
+            raw_num = fm.get("禁制", "").strip()
+            want_series = SERIES_OF_TIER.get(tier)
+            if not series:
+                errors.append(f"{rel}: 缺「系列」字段（混沌/先天/后天）")
+            elif want_series and series != want_series:
+                errors.append(
+                    f"{rel}: 系列「{series}」与品阶「{tier}」不符，应为「{want_series}」"
+                )
+            if not raw_num:
+                errors.append(f"{rel}: 缺「禁制」字段（1-49 道，49 道为至宝）")
+            else:
+                try:
+                    num = int(raw_num)
+                except ValueError:
+                    errors.append(f"{rel}: 禁制「{raw_num}」不是整数")
+                else:
+                    want_grade = grade_of(num)
+                    if want_grade is None:
+                        errors.append(f"{rel}: 禁制 {num} 超出 1-49 范围")
+                    elif not grade:
+                        errors.append(f"{rel}: 缺「品级」字段（下品/中品/上品/极品/至宝）")
+                    elif grade not in GRADES:
+                        errors.append(
+                            f"{rel}: 品级「{grade}」不在枚举内（{'/'.join(GRADES)}）"
+                        )
+                    elif grade != want_grade:
+                        errors.append(
+                            f"{rel}: 品级「{grade}」与 {num} 道禁制不匹配，应为「{want_grade}」"
+                        )
+                    if tier.endswith("至宝") and num != 49:
+                        errors.append(f"{rel}: 品阶「{tier}」须为 49 道禁制，现写 {num}")
+                    if tier.endswith("灵宝") and num == 49:
+                        errors.append(f"{rel}: 49 道禁制即至宝，不能再算「{tier}」")
 
         entries[path.stem] = (rel, fm)
 
