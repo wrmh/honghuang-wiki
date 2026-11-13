@@ -165,26 +165,25 @@ def main():
         "",
         "改完一条就在对应词条里把 `- [ ]` 改成 `- [x]`（或直接删掉该行），然后重跑脚本，汇总页会同步。",
         "",
-        "## 按词条",
+        "## 按编号（全文顺序）",
         "",
-        "| 编号 | 词条 | 未定稿问题 |",
-        "|---|---|---|",
     ]
-    for entry in sorted(by_entry, key=lambda e: by_entry[e][0][0]):
-        for uid, q in sorted(by_entry[entry]):
-            out.append(f"| {uid} | [[{entry}]] | {q} |")
+    for uid, entry, q in rows:
+        out.append(f"- **{uid}** ｜ [[{entry}]] ｜ {q}")
 
     out += [
         "",
-        "## 按编号",
+        "## 按词条",
         "",
-        "引用时用编号即可，不必抄问题全文。",
-        "",
-        "| 编号 | 一句话 |",
-        "|---|---|",
     ]
-    for uid, entry, q in rows:
-        out.append(f"| {uid} | [[{entry}]]：{q} |")
+    for entry in sorted(by_entry, key=lambda e: by_entry[e][0][0]):
+        ids = sorted(uid for uid, _ in by_entry[entry])
+        span = ids[0] if len(ids) == 1 else f"{ids[0]} – {ids[-1]}"
+        out.append(f"### [[{entry}]]（{span}）")
+        out.append("")
+        for uid, q in sorted(by_entry[entry]):
+            out.append(f"- `{uid}` {q}")
+        out.append("")
 
     out.append("")
     write_lf(SUMMARY, "\n".join(out))
