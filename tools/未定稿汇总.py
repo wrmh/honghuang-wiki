@@ -46,11 +46,12 @@ def write_lf(path, text):
 
 
 def iter_entries():
+    """遍历类型目录下所有词条。递归：法宝/人物 有档位子目录（法宝\先天灵宝\…）。"""
     for idx, d in enumerate(TYPE_DIRS):
         p = ROOT / d
         if not p.is_dir():
             continue
-        for f in sorted(p.glob("*.md"), key=lambda x: (RANK.get(x.stem, 99), x.stem)):
+        for f in sorted(p.rglob("*.md"), key=lambda x: (RANK.get(x.stem, 99), str(x))):
             yield idx, f
 
 
