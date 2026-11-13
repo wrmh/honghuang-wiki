@@ -33,6 +33,8 @@ RANK = {"开天辟地": 0, "龙汉初劫": 1, "巫妖量劫": 2, "封神量劫":
 
 HEADING = "## 未定稿问题"
 ITEM_RE = re.compile(r"^- \[ \]\s*(?:U-\d+\s+)?(.*\S)\s*$")
+# 条目下的缩进选项行：`  - A 选项文本`（A~Z 编号，用户选定后写回裁决）
+OPT_RE = re.compile(r"^\s+- ([A-Za-z])[\.、）)]?\s+(.*\S)\s*$")
 ID_RE = re.compile(r"^U-(\d{3})$")
 # 文件名允许排序前缀（00-地图变迁.md → 词条名 地图变迁）
 SORT_PREFIX = re.compile(r"^\d{2}-")
@@ -71,12 +73,18 @@ def split_sections(text):
             end = j
             break
     body = lines[start + 1:end]
-    items = []
+    items = []      # [(问题, [(字母, 选项文本), ...]), ...]
+    cur = None
     for ln in body:
         m = ITEM_RE.match(ln)
         if m:
-            items.append(m.group(1))
-    return lines, start, end, items
+            cur = [m.group(1), []]
+            items.append(cur)
+            continue
+        mo = OPT_RE.match(ln)
+        if mo and cur is not None:
+            cur[1].append((mo.group(1).upper(), mo.group(2)))
+    return lines, start, end, [(q, tuple(o)) for q, o in items]
 
 
 def load_map():
@@ -130,15 +138,17 @@ def main():
         ename = SORT_PREFIX.sub("", f.stem)
         lines[start + 1:end] = []
         new_body = [""]
-        for q in items:
+        for q, opts in items:
             k = key_of(ename, q)
             uid = id_map.get(k)
             if uid is None:
                 uid = f"U-{next_id:03d}"
                 next_id += 1
                 id_map[k] = uid
-            rows.append((uid, f.stem, q))
+            rows.append((uid, f.stem, q, opts))
             new_body.append(f"- [ ] {uid} {q}")
+            for letter, txt in opts:
+                new_body.append(f"  - {letter} {txt}")
         new_body.append("")
 
         out = lines[:start + 1] + new_body + lines[end:]
@@ -148,15 +158,16 @@ def main():
             changed_files += 1
 
     # 清掉已不存在的编号，避免 map 无限膨胀
-    live_keys = {key_of(e, q) for _, e, q in rows}
+    live_keys = {key_of(e, q) for _, e, q, _ in rows}
     id_map = {k: v for k, v in id_map.items() if k in live_keys}
 
     rows.sort(key=lambda r: r[0])
 
     if args.check:
         print(f"未定稿问题 {len(rows)} 条，编号映射 {len(id_map)} 项")
-        for uid, entry, q in rows:
-            print(f"  {uid}  {entry}  {q}")
+        for uid, entry, q, opts in rows:
+            mark = f"（{len(opts)} 个选项）" if opts else ""
+            print(f"  {uid}  {entry}  {q}{mark}")
         return
 
     MAP_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -167,8 +178,8 @@ def main():
 
     # 生成汇总页：按词条分组，组内按编号升序
     by_entry = {}
-    for uid, entry, q in rows:
-        by_entry.setdefault(entry, []).append((uid, q))
+    for uid, entry, q, opts in rows:
+        by_entry.setdefault(entry, []).append((uid, q, opts))
 
     out = [
         "---",
@@ -188,11 +199,16 @@ def main():
         "",
         "改完一条就在对应词条里把 `- [ ]` 改成 `- [x]`（或直接删掉该行），然后重跑脚本，汇总页会同步。",
         "",
+        "> **怎么回答**：每条问题下面挂着 A~Z 几个选项（写问题时就按「各家既有设定 + 本库口径」先摆好）。"
+        "回「U-078 选 B」即可；都不满意就自己给一个，我按你的写。选项写在条目里的缩进行 `  - A …`，"
+        "脚本会原样带过来，不会被覆盖。",
+        "",
         "## 按编号（全文顺序）",
         "",
     ]
-    for uid, entry, q in rows:
-        out.append(f"- **{uid}** ｜ [[{entry}]] ｜ {q}")
+    for uid, entry, q, opts in rows:
+        tail = "（附选项）" if opts else ""
+        out.append(f"- **{uid}** ｜ [[{entry}]] ｜ {q}{tail}")
 
     out += [
         "",
@@ -200,12 +216,14 @@ def main():
         "",
     ]
     for entry in sorted(by_entry, key=lambda e: by_entry[e][0][0]):
-        ids = sorted(uid for uid, _ in by_entry[entry])
+        ids = sorted(uid for uid, _, _ in by_entry[entry])
         span = ids[0] if len(ids) == 1 else f"{ids[0]} – {ids[-1]}"
         out.append(f"### [[{entry}]]（{span}）")
         out.append("")
-        for uid, q in sorted(by_entry[entry]):
+        for uid, q, opts in sorted(by_entry[entry]):
             out.append(f"- `{uid}` {q}")
+            for letter, txt in opts:
+                out.append(f"  - **{letter}** {txt}")
         out.append("")
 
     if archived:
@@ -236,7 +254,7 @@ def main():
     print(f"改写了 {changed_files} 个词条文件")
     print(f"汇总页已写入 {SUMMARY.relative_to(ROOT)}")
     print(f"编号映射已写入 {MAP_FILE.relative_to(ROOT)}")
-    ids = [u for u, _, _ in rows]
+    ids = [u for u, _, _, _ in rows]
     print(f"编号范围 {ids[0]} – {ids[-1]}")
 
 
