@@ -1,0 +1,18 @@
+{
+  "attachmentFolderPath": "附件",
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "current",
+  "promptDelete": false,
+  "readableLineLength": true,
+  "livePreview": true,
+  "showFrontmatter": true,
+  "foldHeading": true,
+  "foldIndent": true,
+  "strictLineBreaks": false,
+  "defaultViewMode": "preview",
+  "showUnsupportedFiles": false,
+  "userIgnoreFilters": [
+    "_模板/",
+    "tools/"
+  ]
+}

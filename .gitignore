@@ -1,0 +1,8 @@
+# Obsidian 运行时状态（每次开关都会变，不入库）
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.trash/
+site/
+__pycache__/
+*~
