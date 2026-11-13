@@ -115,6 +115,8 @@ CLI 和 `tools\检查.py` 不重复：CLI 查不到「文件名 ≠ 词条字段
 
 仓库：<https://github.com/wrmh/honghuang-wiki>（public）
 
+线上页面：<https://wrmh.github.io/honghuang-wiki/>（GitHub Pages，从 `gh-pages` 分支取；目前是占位页，正式站点待 `mkdocs build` 覆盖）
+
 分支只有两个，各有各的用途，不要合并：
 
 | 分支 | 内容 | 谁在用 |
@@ -124,7 +126,7 @@ CLI 和 `tools\检查.py` 不重复：CLI 查不到「文件名 ≠ 词条字段
 
 **不开 `dev` 分支**，原因很具体：在 Obsidian 里切换分支，文件列表会瞬间换成另一套，容易误删、容易把「词条不见了」当成丢文件。草稿和成稿的区分用 `状态` 字段做，不用分支做——分支是给「发布物」用的，不是给「写作阶段」用的。
 
-日常提交：
+日常提交：装了 Obsidian Git 插件，每 15 分钟自动 commit + push，一般不用手敲。手动兜底：
 
 ```powershell
 git add -A
@@ -132,7 +134,19 @@ git commit -m "新增 事件/开天辟地"
 git push
 ```
 
-装了 Obsidian Git 插件（见下节）以后，这一步可以自动完成：每 10 分钟自动提交并推送一次。
+### 本机的两个网络前提（换机器要重配）
+
+这台机器访问 github.com 必须走本地代理，否则 `git` 直接连会被 reset（浏览器能开是因为系统代理设在 WinINET，git 不读那个）：
+
+```powershell
+git config --global http.proxy  http://127.0.0.1:10808
+git config --global https.proxy http://127.0.0.1:10808
+```
+
+- 代理端口以你本地代理软件的实际端口为准，`10808` 是当前这台机器的值
+- 改完用 `git config --global --get http.proxy` 确认写进去了；想看它到底生效没有，不必推仓库，`git ls-remote origin -h refs/heads/main` 能返回一行 sha 就说明通了
+- `api.github.com` 不需要代理也能通，所以建仓库、查 Pages 状态可以直接用 REST API
+- 凭据走 Windows 凭据管理器（已存 `wrmh` 的 token），Obsidian Git 插件调的也是同一个 git 可执行文件，所以插件自动推送和手敲命令走同一条路径
 
 ## 插件
 
@@ -141,8 +155,13 @@ git push
 | 插件 | 用途 | 为什么值得装 |
 |---|---|---|
 | Dataview | 把 `索引.md` 里的表改成自动查询 | 词条上百篇后，手维护索引表必然过期；Dataview 直接扫头信息生成 |
-| Obsidian Git | 定时自动 commit + push | 不装的话每次改动要么手动推，要么忘推，GitHub 上永远是旧版 |
+| Obsidian Git | 定时自动 commit + push（15 分钟） | 不装的话每次改动要么手动推，要么忘推，GitHub 上永远是旧版 |
 | Advanced Tables | 表格编辑时自动对齐、Tab 跳格 | 本库大量使用表格（版本差异、统计），手敲竖线极易错位 |
+
+两条关于 Dataview 的坑：
+
+- **Dataview 不认 Obsidian 的忽略规则**。`.obsidian/app.json` 里的 `userIgnoreFilters` 只影响图谱和搜索，四份 `_模板/` 会照样进查询结果。所有查询都必须写 `FROM -"_模板" and -"tools"`。
+- `FROM` 后面两个负向源要用 `and` 连，写成 `FROM -"a" -"b"` 会直接报 PARSING FAILED。
 
 ## 当前进度
 
