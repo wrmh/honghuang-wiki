@@ -39,9 +39,11 @@ TIERS = {
     "人物": ("层级", ("混沌", "圣人", "准圣", "大罗金仙", "太乙玄仙", "金仙")),
 }
 
-# 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13）：
+# 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13，至宝上限改 2026-11-13 晚）：
 #   系列 = 混沌 > 先天 > 后天（混沌是特殊的先天，只有盘古与混沌魔神才有）
-#   禁制 1-12 下品灵宝 / 13-24 中品 / 25-36 上品 / 37-48 极品 / 49 至宝
+#   灵宝：1-12 下品 / 13-24 中品 / 25-36 上品 / 37-48 极品
+#   至宝：混沌至宝 50 道（大道五十，开天前才容得下）／先天至宝与后天至宝 49 道
+#   50 道是大道全数：开天之后天意不容其存在，故必碎或失踪；留存下来的至宝都得「遁去一道」降到 49
 SERIES_OF_TIER = {
     "混沌至宝": "混沌", "混沌灵宝": "混沌",
     "先天至宝": "先天", "先天灵宝": "先天",
@@ -51,10 +53,14 @@ GRADE_BANDS = ((1, 12, "下品"), (13, 24, "中品"), (25, 36, "上品"), (37, 4
 GRADES = tuple(g for _, _, g in GRADE_BANDS) + ("至宝",)
 EXEMPT_TAG = "分类条目"
 
+# 至宝档的精确禁制数：混沌至宝 50 道，先天/后天至宝 49 道
+TIER_EXACT = {"混沌至宝": 50, "先天至宝": 49, "后天至宝": 49}
+MAX_JINZHI = 50
+
 
 def grade_of(num):
-    """禁制道数 → 品级；越界返回 None。"""
-    if num == 49:
+    """禁制道数 → 品级；越界返回 None。49 与 50 都是至宝，但归属不同档。"""
+    if num in (49, 50):
         return "至宝"
     for lo, hi, grade in GRADE_BANDS:
         if lo <= num <= hi:
@@ -213,7 +219,7 @@ def main() -> int:
                     f"{rel}: 系列「{series}」与品阶「{tier}」不符，应为「{want_series}」"
                 )
             if not raw_num:
-                errors.append(f"{rel}: 缺「禁制」字段（1-49 道，49 道为至宝）")
+                errors.append(f"{rel}: 缺「禁制」字段（灵宝 1-48 道，至宝 49 道；混沌至宝 50 道）")
             else:
                 try:
                     num = int(raw_num)
@@ -222,7 +228,7 @@ def main() -> int:
                 else:
                     want_grade = grade_of(num)
                     if want_grade is None:
-                        errors.append(f"{rel}: 禁制 {num} 超出 1-49 范围")
+                        errors.append(f"{rel}: 禁制 {num} 超出 1-50 范围")
                     elif not grade:
                         errors.append(f"{rel}: 缺「品级」字段（下品/中品/上品/极品/至宝）")
                     elif grade not in GRADES:
@@ -233,10 +239,15 @@ def main() -> int:
                         errors.append(
                             f"{rel}: 品级「{grade}」与 {num} 道禁制不匹配，应为「{want_grade}」"
                         )
-                    if tier.endswith("至宝") and num != 49:
-                        errors.append(f"{rel}: 品阶「{tier}」须为 49 道禁制，现写 {num}")
-                    if tier.endswith("灵宝") and num == 49:
-                        errors.append(f"{rel}: 49 道禁制即至宝，不能再算「{tier}」")
+                    exact = TIER_EXACT.get(tier)
+                    if exact is not None and num != exact:
+                        errors.append(
+                            f"{rel}: 品阶「{tier}」须为 {exact} 道禁制，现写 {num}"
+                        )
+                    if tier.endswith("灵宝") and num > 48:
+                        errors.append(
+                            f"{rel}: {num} 道禁制已是至宝档（49/50），不能再算「{tier}」"
+                        )
 
         entries[path.stem] = (rel, fm)
 
