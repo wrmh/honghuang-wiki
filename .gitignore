@@ -1,9 +1,14 @@
-# Obsidian 运行时状态（每次开关都会变，不入库）
+# Obsidian 运行时状态（每台机器不同，不要同步）
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
-.obsidian/cache
+
+# 插件二进制可重新下载，不占仓库体积（清单见 README「插件」一节的仓库名）
+.obsidian/plugins/*/main.js
+.obsidian/plugins/*/styles.css
+
+# 其它
 .trash/
-site/
-__pycache__/
-*~
 _截图/
+__pycache__/
+*.pyc
+site/
