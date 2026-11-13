@@ -67,6 +67,32 @@ python tools\检查.py        # 断链、重名、缺字段；有问题退出码
 - 缺 `词条` / `类型` / `状态`
 - 文件名和 `词条` 字段对不上
 
+## 命令行（Obsidian 官方 CLI）
+
+Obsidian 从 1.12.7 起自带 CLI，**不需要装任何插件**。本机已开启并注册进 PATH。
+
+前提：Obsidian 必须正在运行（CLI 是连到运行中的实例，不是自己读文件）。
+
+```powershell
+obsidian version                       # 1.15.1 (installer 1.15.1)
+obsidian unresolved counts             # 被引用但还没正文的词条 = 待办清单
+obsidian orphans total                 # 没有入链的孤立词条
+obsidian backlinks file=东皇钟          # 谁引用了它
+obsidian open file=帝俊                 # 在 Obsidian 里打开
+obsidian create name=太一 template=人物  # 按模板建词条（模板目录已指向 _模板）
+obsidian search query=巫妖 total
+obsidian properties counts             # 全库头信息字段统计
+obsidian wordcount file=巫妖量劫
+obsidian command id=graph:open         # 执行命令面板里的任意命令
+```
+
+两条必须记住：
+
+- `unresolved` 不认忽略规则，模板里不能留真链接。占位符统一写成 `{{人名}}`，替换成词条名以后自己套 `[[ ]]`。
+- PATH 改动只对新开的终端生效；旧终端里用全路径 `F:\Obsidian\Obsidian.com`。
+
+CLI 和 `tools\检查.py` 不重复：CLI 查不到「文件名 ≠ 词条字段」「类型不在枚举」「缺 front matter」，脚本查不到实时预览和反向链接。两个都留着。
+
 ## 当前进度
 
 - 格式与骨架：已就位
