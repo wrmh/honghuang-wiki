@@ -35,6 +35,13 @@ ITEM_RE = re.compile(r"^- \[ \]\s*(?:U-\d+\s+)?(.*\S)\s*$")
 ID_RE = re.compile(r"^U-(\d{3})$")
 
 
+def write_lf(path, text):
+    """统一按 LF 写盘。Windows 下 Path.write_text 默认把换行翻成 CRLF，
+    会和库里其余文件打架（.gitattributes 要求 eol=lf）。"""
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+
+
 def iter_entries():
     for idx, d in enumerate(TYPE_DIRS):
         p = ROOT / d
@@ -115,7 +122,7 @@ def main():
         out = lines[:start + 1] + new_body + lines[end:]
         new_text = "\n".join(out)
         if new_text != text and not args.check:
-            f.write_text(new_text, encoding="utf-8")
+            write_lf(f, new_text)
             changed_files += 1
 
     # 清掉已不存在的编号，避免 map 无限膨胀
@@ -131,9 +138,9 @@ def main():
         return
 
     MAP_FILE.parent.mkdir(parents=True, exist_ok=True)
-    MAP_FILE.write_text(
+    write_lf(
+        MAP_FILE,
         json.dumps(dict(sorted(id_map.items())), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
     )
 
     # 生成汇总页：按词条分组，组内按编号升序
@@ -180,7 +187,7 @@ def main():
         out.append(f"| {uid} | [[{entry}]]：{q} |")
 
     out.append("")
-    SUMMARY.write_text("\n".join(out), encoding="utf-8")
+    write_lf(SUMMARY, "\n".join(out))
 
     print(f"未定稿问题 {len(rows)} 条，分布于 {len(by_entry)} 个词条")
     print(f"改写了 {changed_files} 个词条文件")
