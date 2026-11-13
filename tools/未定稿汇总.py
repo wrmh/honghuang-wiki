@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # 最后是统摄性的概念。目录枚举顺序变了不影响已有编号（编号靠哈希表锚定）。
 TYPE_DIRS = ("事件", "量劫", "人物", "势力", "阵法", "法宝", "地理", "功法", "概念")
 MAP_FILE = ROOT / "tools" / "未定稿编号.json"
+ARCHIVE = ROOT / "tools" / "未定稿已结.json"
 SUMMARY = ROOT / "概念" / "未定稿问题.md"
 
 # 五劫的时间先后。只影响「新问题拿到的编号」，不影响已发出的编号。
@@ -81,6 +82,16 @@ def load_map():
     return {}
 
 
+def load_archive():
+    """已裁决归档。回答过的问题从这里留档：编号不再复用，汇总页也能给出结论。
+    归档是手工维护的（裁决一次写一次），脚本只读不写。"""
+    if ARCHIVE.exists():
+        data = json.loads(ARCHIVE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+    return {"裁决日期": "", "rulings": []}
+
+
 def key_of(entry_name, question):
     return hashlib.sha1(f"{entry_name}｜{question}".encode("utf-8")).hexdigest()[:16]
 
@@ -91,7 +102,13 @@ def main():
     args = ap.parse_args()
 
     id_map = load_map()
+    archive = load_archive()
+    archived = [
+        r for r in archive.get("rulings", []) if ID_RE.match(str(r.get("id", "")))
+    ]
     used = {v for v in id_map.values() if isinstance(v, str) and ID_RE.match(v)}
+    # 归档里的编号也算「已用」，否则 closed 的号会被重新发给新问题
+    used |= {r["id"] for r in archived}
     next_id = 1 + max((int(ID_RE.match(v).group(1)) for v in used), default=0)
 
     rows = []          # (id, entry_name, question)
@@ -161,7 +178,8 @@ def main():
         "> 由 `python tools\\未定稿汇总.py` 自动生成，**不要手改**——手改的内容下次运行就没了。",
         "> 编号 U-xxx 是稳定的：新增问题不会让已有编号变动，所以引用「U-007」永远指同一条。",
         "",
-        f"共 **{len(rows)}** 条，分布在 **{len(by_entry)}** 个词条里。",
+        f"共 **{len(rows)}** 条，分布在 **{len(by_entry)}** 个词条里。"
+        + (f"另有已裁决 **{len(archived)}** 条（见文末归档）。" if archived else ""),
         "",
         "改完一条就在对应词条里把 `- [ ]` 改成 `- [x]`（或直接删掉该行），然后重跑脚本，汇总页会同步。",
         "",
@@ -184,6 +202,27 @@ def main():
         for uid, q in sorted(by_entry[entry]):
             out.append(f"- `{uid}` {q}")
         out.append("")
+
+    if archived:
+        out += [
+            "## 已裁决（归档，不再计入未定稿）",
+            "",
+            f"> 裁决日期：{archive.get('裁决日期') or '未记录'}。结论已写进各词条正文，"
+            "编号保留、不再复用。归档文件：`tools/未定稿已结.json`（手工维护）。",
+            "",
+        ]
+        arch_by_entry = {}
+        for r in sorted(archived, key=lambda r: r["id"]):
+            arch_by_entry.setdefault(r.get("entry", "?"), []).append(r)
+        for entry in sorted(arch_by_entry, key=lambda e: arch_by_entry[e][0]["id"]):
+            ids = [r["id"] for r in arch_by_entry[entry]]
+            span = ids[0] if len(ids) == 1 else f"{ids[0]} – {ids[-1]}"
+            out.append(f"### [[{entry}]]（{span}）")
+            out.append("")
+            for r in arch_by_entry[entry]:
+                out.append(f"- `{r['id']}` **已决**：{r.get('decision', '')}")
+                out.append(f"  - 原问题：{r.get('question', '')}")
+            out.append("")
 
     out.append("")
     write_lf(SUMMARY, "\n".join(out))
