@@ -34,6 +34,8 @@ RANK = {"开天辟地": 0, "龙汉初劫": 1, "巫妖量劫": 2, "封神量劫":
 HEADING = "## 未定稿问题"
 ITEM_RE = re.compile(r"^- \[ \]\s*(?:U-\d+\s+)?(.*\S)\s*$")
 ID_RE = re.compile(r"^U-(\d{3})$")
+# 文件名允许排序前缀（00-地图变迁.md → 词条名 地图变迁）
+SORT_PREFIX = re.compile(r"^\d{2}-")
 
 
 def write_lf(path, text):
@@ -123,10 +125,12 @@ def main():
         if not items:
             continue
 
+        # 文件名带排序前缀（00-地图变迁.md）时，词条名应取 地图变迁
+        ename = SORT_PREFIX.sub("", f.stem)
         lines[start + 1:end] = []
         new_body = [""]
         for q in items:
-            k = key_of(f.stem, q)
+            k = key_of(ename, q)
             uid = id_map.get(k)
             if uid is None:
                 uid = f"U-{next_id:03d}"

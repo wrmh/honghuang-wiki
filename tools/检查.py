@@ -32,8 +32,18 @@ SKIP_FILES = {"README.md"}
 TYPES = ("量劫", "人物", "势力", "法宝", "阵法", "地理", "功法", "事件", "概念")
 STATUSES = ("草稿", "待核", "成稿")
 
+# 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
+# 法宝按品阶分，人物按层级分；其余类型仍是一层目录。
+TIERS = {
+    "法宝": ("品阶", ("混沌至宝", "先天灵宝", "准先天", "后天灵宝")),
+    "人物": ("层级", ("混沌", "圣人", "准圣", "大罗金仙", "太乙玄仙", "金仙")),
+}
+
 # 允许放在库根、不受「目录=类型」约束的文件
 ROOT_OK = {"索引.md"}
+
+# 允许文件名带排序前缀（00-、01- …），比对词条名时先剥掉
+SORT_PREFIX = re.compile(r"^\d{2}-")
 
 REQUIRED = ("词条", "类型", "状态")
 LINK_RE = re.compile(r"\[\[([^\[\]]+?)\]\]")
@@ -116,9 +126,11 @@ def main() -> int:
             errors.append(f"{rel}: 缺必填字段 {'、'.join(missing)}")
 
         name = fm.get("词条", "").strip()
-        if name and name != path.stem:
+        # 允许「00-」这类排序前缀：文件名 00-地图变迁.md 对应 词条: 地图变迁
+        stem_key = SORT_PREFIX.sub("", path.stem)
+        if name and name not in (path.stem, stem_key):
             errors.append(
-                f"{rel}: 词条「{name}」与文件名「{path.stem}」不一致，[[{name}]] 会接不上"
+                f"{rel}: 词条「{name}」与文件名「{stem_key}」不一致，[[{name}]] 会接不上"
             )
 
         kind = fm.get("类型", "").strip()
@@ -130,7 +142,8 @@ def main() -> int:
             errors.append(f"{rel}: 状态「{status}」不在枚举内（{'/'.join(STATUSES)}）")
 
         # 目录与类型必须一致；库根只允许 ROOT_OK 里的文件
-        top = rel.parts[0] if len(rel.parts) > 1 else None
+        depth = len(rel.parts)
+        top = rel.parts[0] if depth > 1 else None
         if top is None:
             if path.name not in ROOT_OK:
                 errors.append(
@@ -143,6 +156,26 @@ def main() -> int:
                 errors.append(
                     f"{rel}: 类型「{kind}」与所在目录「{top}」不符，按类型目录约定应放在 {kind}\\"
                 )
+            elif top in TIERS:
+                field, allowed = TIERS[top]
+                if depth != 3:
+                    errors.append(
+                        f"{rel}: {top}必须放进档位子目录（{'/'.join(allowed)}），"
+                        f"即 {top}\\<档位>\\{path.name}"
+                    )
+                else:
+                    sub = rel.parts[1]
+                    if sub not in allowed:
+                        errors.append(
+                            f"{rel}: 档位目录「{sub}」不在枚举内（{'/'.join(allowed)}）"
+                        )
+                    elif fm.get(field, "").strip() != sub:
+                        errors.append(
+                            f"{rel}: 档位「{fm.get(field, '（缺）')}」（{field} 字段）"
+                            f"与所在档位目录「{sub}」不符"
+                        )
+            elif depth > 2:
+                errors.append(f"{rel}: 「{top}」不设子目录，请直接放在 {top}\\{path.name}")
 
         entries[path.stem] = (rel, fm)
 
@@ -178,6 +211,16 @@ def main() -> int:
     print(f"词库自检  {root}")
     print(f"扫描词条 {len(entries)} 篇，引用 {sum(refs.values())} 处，指向 {len(refs)} 个词条")
     print("分类分布  " + "  ".join(f"{t}{n}" for t, n in dist.items() if n))
+    for kind_name, (field, allowed) in TIERS.items():
+        counts = {}
+        for _stem, (_rel, fm) in entries.items():
+            if fm.get("类型", "").strip() == kind_name:
+                v = fm.get(field, "").strip() or "（缺）"
+                counts[v] = counts.get(v, 0) + 1
+        if counts:
+            parts = [f"{t}{counts[t]}" for t in allowed if counts.get(t)]
+            parts += [f"{t}{n}" for t, n in counts.items() if t not in allowed]
+            print(f"{kind_name}档位  " + "  ".join(parts))
     print(f"状态     草稿 {draft} 篇，其余 {len(entries) - draft} 篇")
     print()
     print("E 级（阻塞）")
