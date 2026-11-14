@@ -154,13 +154,15 @@ def main() -> int:
     entries: dict[str, tuple[Path, dict]] = {}
     refs: dict[str, int] = {}
 
-    # 势力公约：只有「金字塔结构完整的组织」才单独成条（势力\<大势力>.md），
-    # 组成部分一律挂到 势力\<大势力>\<组>\<子条目>.md（组可省）。
+    # 势力公约：只有「金字塔结构完整的组织」才单独成条，而且**本体也要放进同名目录**
+    #   势力\<大势力>\<大势力>.md        本体（第二层，front matter 不写「归属」）
+    #   势力\<大势力>\[<组>\]<子条目>.md   组成部分（front matter 写 `归属: <大势力>`）
     moe_first_level = {
         p.stem
         for p in files
-        if len(p.relative_to(root).parts) == 2
+        if len(p.relative_to(root).parts) == 3
         and p.relative_to(root).parts[0] == "势力"
+        and p.stem == p.relative_to(root).parts[1]
     }
 
     for path in files:
@@ -230,31 +232,40 @@ def main() -> int:
                             f"与所在档位目录「{sub}」不符"
                         )
             elif top == "势力":
-                if depth == 2:
+                if depth < 3:
+                    errors.append(
+                        f"{rel}: 势力本体也要放进同名目录（第二层），"
+                        f"即 势力\\{path.stem}\\{path.name}"
+                    )
+                elif depth > 4:
+                    errors.append(
+                        f"{rel}: 势力最多两层（势力\\<大势力>\\<大势力>.md 与 "
+                        f"势力\\<大势力>\\[<组>\\]<子条目>.md）"
+                    )
+                elif path.stem == rel.parts[1]:
+                    # 大势力本体（第二层）
                     if fm.get("归属", "").strip():
                         errors.append(
-                            f"{rel}: 一级势力不写「归属」（它本身就是归宿）；"
+                            f"{rel}: 大势力本体不写「归属」（它本身就是归宿）；"
                             f"「归属」只给挂在大势力下的组成部分"
                         )
-                    if len([ln for ln in body.splitlines() if ln.startswith("## ")]) < 3:
+                    secs = len([ln for ln in body.splitlines() if ln.startswith("## ")])
+                    if secs < 3:
                         soft.append(
-                            f"{rel}: 只 {len([ln for ln in body.splitlines() if ln.startswith('## ')])} 节，"
-                            f"金字塔结构可能不足三层——不够就别单独成条，挂到上级势力下"
+                            f"{rel}: 只 {secs} 节，金字塔结构可能不足三层——"
+                            f"不够就别单独成条，挂到上级势力下"
                         )
-                elif depth in (3, 4):
+                else:
                     parent = rel.parts[1]
                     if parent not in moe_first_level:
                         errors.append(
-                            f"{rel}: 挂在「{parent}」下，但 势力\\{parent}.md 不存在——大势力必须先立条"
+                            f"{rel}: 挂在「{parent}」下，但 势力\\{parent}\\{parent}.md 不存在"
+                            f"——大势力本体必须先立条"
                         )
                     if fm.get("归属", "").strip() != parent:
                         errors.append(
                             f"{rel}: 归属「{fm.get('归属', '（缺）')}」与所在大势力目录「{parent}」不符"
                         )
-                else:
-                    errors.append(
-                        f"{rel}: 势力最多两级目录（势力\\<大势力>\\[<组>\\]<子条目>.md）"
-                    )
             elif depth > 2:
                 errors.append(f"{rel}: 「{top}」不设子目录，请直接放在 {top}\\{path.name}")
 
