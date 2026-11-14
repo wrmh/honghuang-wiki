@@ -32,11 +32,20 @@ SKIP_FILES = {"README.md"}
 TYPES = ("量劫", "人物", "势力", "法宝", "阵法", "地理", "功法", "事件", "概念")
 STATUSES = ("草稿", "待核", "成稿")
 
+# 人物境界阶梯（用户 2026-11-14 定稿）：目录名 = 境界值，两者一一对应。
+# 「混沌」不在阶梯内，是盘古与混沌魔神的特例（排在阶梯之前，序 0）。
+LEVEL_LADDER = (
+    "凡人", "引气入体", "炼气化神", "炼神返虚", "炼虚合道",
+    "地仙", "天仙", "玄仙", "金仙", "太乙金仙", "大罗金仙", "准圣", "圣人",
+)
+LEVEL_RANK = {name: i + 1 for i, name in enumerate(LEVEL_LADDER)}
+LEVEL_RANK["混沌"] = 0
+
 # 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
-# 法宝按品阶分，人物按层级分；其余类型仍是一层目录。
+# 法宝按品阶分，人物按境界分；其余类型仍是一层目录。
 TIERS = {
     "法宝": ("品阶", ("混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝")),
-    "人物": ("层级", ("混沌", "圣人", "准圣", "大罗金仙", "太乙玄仙", "金仙")),
+    "人物": ("境界", ("混沌",) + LEVEL_LADDER),
 }
 
 # 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13，至宝上限改 2026-11-13 晚）：
@@ -249,6 +258,27 @@ def main() -> int:
                             f"{rel}: {num} 道禁制已是至宝档（49/50），不能再算「{tier}」"
                         )
 
+        # 人物：境界必须在阶梯内，境界序必须与境界一致（给 Dataview 排序用）
+        if kind == "人物":
+            level = fm.get("境界", "").strip()
+            raw_order = fm.get("境界序", "").strip()
+            if level and level in LEVEL_RANK:
+                want = LEVEL_RANK[level]
+                if not raw_order:
+                    errors.append(f"{rel}: 缺「境界序」字段（应为 {want}）")
+                else:
+                    try:
+                        got = int(raw_order)
+                    except ValueError:
+                        errors.append(f"{rel}: 境界序「{raw_order}」不是整数")
+                    else:
+                        if got != want:
+                            errors.append(
+                                f"{rel}: 境界序 {got} 与境界「{level}」不符，应为 {want}"
+                            )
+            if not fm.get("境界备注", "").strip():
+                errors.append(f"{rel}: 缺「境界备注」（写具体身份，如 祖巫（肉身成圣））")
+
         entries[path.stem] = (rel, fm)
 
         for raw in LINK_RE.findall(strip_code(body)):
@@ -292,7 +322,7 @@ def main() -> int:
         if counts:
             parts = [f"{t}{counts[t]}" for t in allowed if counts.get(t)]
             parts += [f"{t}{n}" for t, n in counts.items() if t not in allowed]
-            print(f"{kind_name}档位  " + "  ".join(parts))
+            print(f"{kind_name}{field}  " + "  ".join(parts))
     print(f"状态     草稿 {draft} 篇，其余 {len(entries) - draft} 篇")
     print()
     print("E 级（阻塞）")
