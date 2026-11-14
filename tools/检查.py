@@ -44,33 +44,44 @@ LEVEL_RANK["混沌"] = 0
 # 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
 # 法宝按品阶分，人物按境界分；其余类型仍是一层目录。
 TIERS = {
-    "法宝": ("品阶", ("混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝")),
+    "法宝": ("品阶", ("混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝", "功德灵宝")),
     "人物": ("境界", ("混沌",) + LEVEL_LADDER),
 }
 
-# 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13，至宝上限改 2026-11-13 晚）：
+# 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13；功德灵宝追加 2026-11-15）：
 #   系列 = 混沌 > 先天 > 后天（混沌是特殊的先天，只有盘古与混沌魔神才有）
 #   灵宝：1-12 下品 / 13-24 中品 / 25-36 上品 / 37-48 极品
+#   后天专属：炼制上限 42 道；43-48 是靠大功德顶上去的，单列「功德灵宝」；49 是功德至宝
 #   至宝：混沌至宝 50 道（大道五十，开天前才容得下）／先天至宝与后天至宝 49 道
 #   50 道是大道全数：开天之后天意不容其存在，故必碎或失踪；留存下来的至宝都得「遁去一道」降到 49
 SERIES_OF_TIER = {
     "混沌至宝": "混沌", "混沌灵宝": "混沌",
     "先天至宝": "先天", "先天灵宝": "先天",
     "后天至宝": "后天", "后天灵宝": "后天",
+    "功德灵宝": "后天",
 }
 GRADE_BANDS = ((1, 12, "下品"), (13, 24, "中品"), (25, 36, "上品"), (37, 48, "极品"))
-GRADES = tuple(g for _, _, g in GRADE_BANDS) + ("至宝",)
+GRADES = tuple(g for _, _, g in GRADE_BANDS) + ("至宝", "功德灵宝")
 EXEMPT_TAG = "分类条目"
 
 # 至宝档的精确禁制数：混沌至宝 50 道，先天/后天至宝 49 道
 TIER_EXACT = {"混沌至宝": 50, "先天至宝": 49, "后天至宝": 49}
 MAX_JINZHI = 50
 
+# 后天系列的炼制上限：超过就必须靠功德顶上（43-48 = 功德灵宝）
+CRAFT_CAP = {"后天灵宝": 42, "功德灵宝": 48}
 
-def grade_of(num):
-    """禁制道数 → 品级；越界返回 None。49 与 50 都是至宝，但归属不同档。"""
+
+def grade_of(num, series=""):
+    """禁制道数 → 品级；越界返回 None。
+
+    49/50 都是至宝；后天系列在 43-48 靠功德提升，单列「功德灵宝」；
+    混沌/先天的 43-48 仍是「极品」（人家本来就长在那个数上）。
+    """
     if num in (49, 50):
         return "至宝"
+    if series == "后天" and 43 <= num <= 48:
+        return "功德灵宝"
     for lo, hi, grade in GRADE_BANDS:
         if lo <= num <= hi:
             return grade
@@ -235,11 +246,11 @@ def main() -> int:
                 except ValueError:
                     errors.append(f"{rel}: 禁制「{raw_num}」不是整数")
                 else:
-                    want_grade = grade_of(num)
+                    want_grade = grade_of(num, series)
                     if want_grade is None:
                         errors.append(f"{rel}: 禁制 {num} 超出 1-50 范围")
                     elif not grade:
-                        errors.append(f"{rel}: 缺「品级」字段（下品/中品/上品/极品/至宝）")
+                        errors.append(f"{rel}: 缺「品级」字段（下品/中品/上品/极品/功德灵宝/至宝）")
                     elif grade not in GRADES:
                         errors.append(
                             f"{rel}: 品级「{grade}」不在枚举内（{'/'.join(GRADES)}）"
@@ -252,6 +263,15 @@ def main() -> int:
                     if exact is not None and num != exact:
                         errors.append(
                             f"{rel}: 品阶「{tier}」须为 {exact} 道禁制，现写 {num}"
+                        )
+                    if tier == "后天灵宝" and num > CRAFT_CAP["后天灵宝"]:
+                        errors.append(
+                            f"{rel}: 后天灵宝炼制上限 {CRAFT_CAP['后天灵宝']} 道，现写 {num}；"
+                            f"43-48 道请归「功德灵宝」（靠功德顶上）"
+                        )
+                    if tier == "功德灵宝" and not (43 <= num <= 48):
+                        errors.append(
+                            f"{rel}: 「功德灵宝」须为 43-48 道，现写 {num}（后天灵宝 1-42，后天至宝 49）"
                         )
                     if tier.endswith("灵宝") and num > 48:
                         errors.append(
