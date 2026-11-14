@@ -324,7 +324,24 @@ def main() -> int:
         if fm.get("状态", "").strip() == "草稿":
             draft += 1
 
-    pending = {t: c for t, c in refs.items() if t not in entries}
+    # 别名转发：[[玲珑宝塔]] 这类写法指向某个词条的 front matter `别名` 时，
+    # 不算「没有正文」，但要单独报出来——别名会掩盖真断链，必须可见。
+    def split_list(raw: str):
+        raw = (raw or "").strip().strip("[]")
+        for sep in ("，", "、", ";"):
+            raw = raw.replace(sep, ",")
+        return [x.strip().strip("'\"") for x in raw.split(",") if x.strip()]
+
+    alias_of: dict[str, str] = {}
+    for _stem, (_rel, fm) in entries.items():
+        owner = fm.get("词条", "").strip() or _stem
+        for a in split_list(fm.get("别名", "")):
+            alias_of.setdefault(a, owner)
+
+    pending = {
+        t: c for t, c in refs.items() if t not in entries and t not in alias_of
+    }
+    alias_hits = {t: c for t, c in refs.items() if t not in entries and t in alias_of}
     ordered = sorted(pending.items(), key=lambda kv: (-kv[1], kv[0]))
 
     print(f"词库自检  {root}")
@@ -355,6 +372,10 @@ def main() -> int:
             print(f"  · {target}  ×{count}")
     else:
         print("  无")
+    if alias_hits:
+        print(f"  —— 另有 {len(alias_hits)} 个链接走的是别名（已有正文，不算待补）：")
+        for target, count in sorted(alias_hits.items(), key=lambda kv: (-kv[1], kv[0])):
+            print(f"     ↪ {target} ×{count} → {alias_of[target]}")
     print()
     print("结论：" + ("有 E 级问题，先修完再加正文" if errors else "无阻塞问题，可以继续写"))
     return 1 if errors else 0
