@@ -255,7 +255,7 @@ def main():
     print(f"汇总页已写入 {SUMMARY.relative_to(ROOT)}")
     print(f"编号映射已写入 {MAP_FILE.relative_to(ROOT)}")
     ids = [u for u, _, _, _ in rows]
-    print(f"编号范围 {ids[0]} – {ids[-1]}")
+    print(f"编号范围 {ids[0]} – {ids[-1]}" if ids else "编号范围 无（全部已裁决）")
 
 
 if __name__ == "__main__":
