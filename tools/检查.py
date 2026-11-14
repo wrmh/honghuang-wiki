@@ -63,6 +63,8 @@ SERIES_OF_TIER = {
 GRADE_BANDS = ((1, 12, "下品"), (13, 24, "中品"), (25, 36, "上品"), (37, 48, "极品"))
 GRADES = tuple(g for _, _, g in GRADE_BANDS) + ("至宝", "功德灵宝")
 EXEMPT_TAG = "分类条目"
+# 先天功德至宝系列仍属先天，但按「功德至宝统一归档」的约定收在 后天至宝/ 目录下 → 豁免系列校验
+EXEMPT_SERIES_TAG = "先天功德至宝"
 
 # 至宝档的精确禁制数：混沌至宝 50 道，先天/后天至宝 49 道
 TIER_EXACT = {"混沌至宝": 50, "先天至宝": 49, "后天至宝": 49}
@@ -70,7 +72,6 @@ MAX_JINZHI = 50
 
 # 后天系列的炼制上限：超过就必须靠功德顶上（43-48 = 功德灵宝）
 CRAFT_CAP = {"后天灵宝": 42, "功德灵宝": 48}
-
 
 def grade_of(num, series=""):
     """禁制道数 → 品级；越界返回 None。
@@ -98,11 +99,9 @@ LINK_RE = re.compile(r"\[\[([^\[\]]+?)\]\]")
 CODE_FENCE_RE = re.compile(r"```.*?```", re.S)
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 
-
 def strip_code(body: str) -> str:
     """去掉代码块与行内代码，避免把示例里的 [[链接]] 当成真引用。"""
     return INLINE_CODE_RE.sub("", CODE_FENCE_RE.sub("", body))
-
 
 def parse_front_matter(text: str):
     """返回 (字段字典 或 None, 正文)。字段只认单行 key: value。"""
@@ -122,7 +121,6 @@ def parse_front_matter(text: str):
             return data, "\n".join(lines[i + 1:])
     return None, text
 
-
 def collect(root: Path):
     files = []
     for path in sorted(root.rglob("*.md")):
@@ -133,7 +131,6 @@ def collect(root: Path):
             continue
         files.append(path)
     return files
-
 
 def main() -> int:
     # 被管道 / 编辑器捕获时强制 UTF-8，避免中文乱码；直接跑在终端时沿用控制台编码
@@ -234,7 +231,7 @@ def main() -> int:
             want_series = SERIES_OF_TIER.get(tier)
             if not series:
                 errors.append(f"{rel}: 缺「系列」字段（混沌/先天/后天）")
-            elif want_series and series != want_series:
+            elif want_series and series != want_series and EXEMPT_SERIES_TAG not in fm.get("标签", ""):
                 errors.append(
                     f"{rel}: 系列「{series}」与品阶「{tier}」不符，应为「{want_series}」"
                 )
@@ -361,7 +358,6 @@ def main() -> int:
     print()
     print("结论：" + ("有 E 级问题，先修完再加正文" if errors else "无阻塞问题，可以继续写"))
     return 1 if errors else 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
