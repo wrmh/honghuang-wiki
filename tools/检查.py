@@ -150,8 +150,18 @@ def main() -> int:
 
     files = collect(root)
     errors: list[str] = []
+    soft: list[str] = []
     entries: dict[str, tuple[Path, dict]] = {}
     refs: dict[str, int] = {}
+
+    # 势力公约：只有「金字塔结构完整的组织」才单独成条（势力\<大势力>.md），
+    # 组成部分一律挂到 势力\<大势力>\<组>\<子条目>.md（组可省）。
+    moe_first_level = {
+        p.stem
+        for p in files
+        if len(p.relative_to(root).parts) == 2
+        and p.relative_to(root).parts[0] == "势力"
+    }
 
     for path in files:
         rel = path.relative_to(root)
@@ -219,6 +229,32 @@ def main() -> int:
                             f"{rel}: 档位「{fm.get(field, '（缺）')}」（{field} 字段）"
                             f"与所在档位目录「{sub}」不符"
                         )
+            elif top == "势力":
+                if depth == 2:
+                    if fm.get("归属", "").strip():
+                        errors.append(
+                            f"{rel}: 一级势力不写「归属」（它本身就是归宿）；"
+                            f"「归属」只给挂在大势力下的组成部分"
+                        )
+                    if len([ln for ln in body.splitlines() if ln.startswith("## ")]) < 3:
+                        soft.append(
+                            f"{rel}: 只 {len([ln for ln in body.splitlines() if ln.startswith('## ')])} 节，"
+                            f"金字塔结构可能不足三层——不够就别单独成条，挂到上级势力下"
+                        )
+                elif depth in (3, 4):
+                    parent = rel.parts[1]
+                    if parent not in moe_first_level:
+                        errors.append(
+                            f"{rel}: 挂在「{parent}」下，但 势力\\{parent}.md 不存在——大势力必须先立条"
+                        )
+                    if fm.get("归属", "").strip() != parent:
+                        errors.append(
+                            f"{rel}: 归属「{fm.get('归属', '（缺）')}」与所在大势力目录「{parent}」不符"
+                        )
+                else:
+                    errors.append(
+                        f"{rel}: 势力最多两级目录（势力\\<大势力>\\[<组>\\]<子条目>.md）"
+                    )
             elif depth > 2:
                 errors.append(f"{rel}: 「{top}」不设子目录，请直接放在 {top}\\{path.name}")
 
@@ -377,6 +413,11 @@ def main() -> int:
         for target, count in sorted(alias_hits.items(), key=lambda kv: (-kv[1], kv[0])):
             print(f"     ↪ {target} ×{count} → {alias_of[target]}")
     print()
+    if soft:
+        print("W 级（提示：结构可能不足以单独成条）")
+        for item in soft:
+            print(f"  ~ {item}")
+        print()
     print("结论：" + ("有 E 级问题，先修完再加正文" if errors else "无阻塞问题，可以继续写"))
     return 1 if errors else 0
 
