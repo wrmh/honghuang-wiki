@@ -455,10 +455,33 @@ def main() -> int:
         return [x.strip().strip("'\"") for x in raw.split(",") if x.strip()]
 
     alias_of: dict[str, str] = {}
+    alias_dupes: dict[str, list[str]] = {}
     for _stem, (_rel, fm) in entries.items():
         owner = fm.get("词条", "").strip() or _stem
         for a in split_list(fm.get("别名", "")):
+            if a == owner:
+                continue
+            # 同一别名被两个词条占用时，Obsidian 的 [[别名]] 会随机落到其中一个，
+            # 等于把「同名不同物」的两件事悄悄并成一件——必须阻塞。
+            if a in alias_of and alias_of[a] != owner:
+                alias_dupes.setdefault(a, [alias_of[a]]).append(owner)
+                continue
+            # 别名撞上另一个词条的正式名，也是冲突：[[别名]] 会落到那个词条，
+            # 别名表却记在别人身上，链接含义被悄悄改写。
+            if a in entries and a != owner:
+                alias_dupes.setdefault(a, [owner]).append(a)
+                continue
             alias_of.setdefault(a, owner)
+
+    if alias_dupes:
+        for _a, _owners in alias_dupes.items():
+            uniq = list(dict.fromkeys(_owners))
+            errors.append(
+                "别名「{0}」被多个词条占用：{1}（别名必须唯一，同名的两件事请起不同名）".format(
+                    _a, " / ".join(uniq)
+                )
+            )
+            print(f"  ✗ 别名冲突 ×1：「{_a}」→ {' / '.join(uniq)}")
 
     # 别名只用于检索：正文双链必须写「词条名」。
     # 拿别名当链接目标，Obsidian 的未解析计数、导出与部分第三方工具都会判成空链。
