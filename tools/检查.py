@@ -257,12 +257,7 @@ def main() -> int:
                 )
             elif top in TIERS:
                 field, allowed = TIERS[top]
-                if depth != 3:
-                    errors.append(
-                        f"{rel}: {top}必须放进档位子目录（{'/'.join(allowed)}），"
-                        f"即 {top}\\<档位>\\{path.name}"
-                    )
-                else:
+                if depth == 3:
                     sub = rel.parts[1]
                     # 允许「01-第一元会」这类排序前缀：目录名去掉前缀后再比对
                     sub_key = SORT_PREFIX.sub("", sub)
@@ -275,6 +270,42 @@ def main() -> int:
                             f"{rel}: 档位「{fm.get(field, '（缺）')}」（{field} 字段）"
                             f"与所在档位目录「{sub_key}」不符"
                         )
+                elif depth == 4 and top == "事件":
+                    # 事件允许一层「大事件分组」（条目太长时拆卷）：
+                    #   事件\<元会>\<大事件>.md            本体
+                    #   事件\<元会>\<大事件>\<子条目>.md   分卷（front matter 写 `归属: <大事件>`）
+                    sub_key = SORT_PREFIX.sub("", rel.parts[1])
+                    grp = rel.parts[2]
+                    if sub_key not in allowed:
+                        errors.append(
+                            f"{rel}: 元会目录「{rel.parts[1]}」不在枚举内（{'/'.join(allowed)}）"
+                        )
+                    elif fm.get(field, "").strip() != sub_key:
+                        errors.append(
+                            f"{rel}: 元会「{fm.get(field, '（缺）')}」（{field} 字段）"
+                            f"与所在元会目录「{sub_key}」不符"
+                        )
+                    if path.stem == grp:
+                        # 本体住进自己的分卷目录（与势力同一套写法）
+                        if fm.get("归属", "").strip():
+                            errors.append(
+                                f"{rel}: 大事件本体不写「归属」（它本身就是归宿）"
+                            )
+                    else:
+                        if not (root / top / rel.parts[1] / grp / f"{grp}.md").exists():
+                            errors.append(
+                                f"{rel}: 挂在「{grp}」下，但 事件\\{rel.parts[1]}\\{grp}\\{grp}.md 不存在"
+                                f"——大事件本体必须先立条"
+                            )
+                        if fm.get("归属", "").strip() != grp:
+                            errors.append(
+                                f"{rel}: 归属「{fm.get('归属', '（缺）')}」与所在大事件目录「{grp}」不符"
+                            )
+                else:
+                    errors.append(
+                        f"{rel}: {top}必须放进档位子目录（{'/'.join(allowed)}），"
+                        f"即 {top}\\<档位>\\{path.name}"
+                    )
             elif top == "势力":
                 if depth < 3:
                     errors.append(
