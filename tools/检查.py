@@ -460,6 +460,20 @@ def main() -> int:
         for a in split_list(fm.get("别名", "")):
             alias_of.setdefault(a, owner)
 
+    # 别名只用于检索：正文双链必须写「词条名」。
+    # 拿别名当链接目标，Obsidian 的未解析计数、导出与部分第三方工具都会判成空链。
+    alias_links = {t: c for t, c in refs.items() if t not in entries and t in alias_of}
+    if alias_links:
+        errors.append(
+            "正文里有链接用的是「别名」而不是词条名（如 [[{0}]]，应写成 [[{1}|{2}]]）".format(
+                next(iter(alias_links)),
+                alias_of[next(iter(alias_links))],
+                next(iter(alias_links)),
+            )
+        )
+        for _t, _c in sorted(alias_links.items(), key=lambda kv: (-kv[1], kv[0])):
+            print(f"  ✗ 别名当链接 ×{_c}：[[{_t}]] → 应写 [[{alias_of[_t]}]]")
+
     pending = {
         t: c for t, c in refs.items() if t not in entries and t not in alias_of
     }
