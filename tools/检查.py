@@ -51,13 +51,20 @@ EVENT_ERAS = ("第零元会", "第一元会", "第二元会", "第三元会", "�
 SPACE_LAYERS = ("总目", "天上", "陆地", "海域", "幽冥", "域外")
 SPACE_RANK = {name: i for i, name in enumerate(SPACE_LAYERS)}
 
+# 概念的门类：按「这一层是什么东西」分，不按题材分。
+# 规则＝世界的算法；记账＝可转移的账与气；制度＝人造的秩序；星位＝编制上的位置；
+# 神通＝能力；总览＝跨条目的骨架页（故事线、未定稿汇总）。
+CONCEPT_KINDS = ("规则", "记账", "制度", "星位", "神通", "总览")
+CONCEPT_RANK = {name: i for i, name in enumerate(CONCEPT_KINDS)}
+
 # 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
-# 法宝按品阶分，人物按境界分，事件按元会分，地理按空间层分；其余类型仍是一层目录。
+# 法宝按品阶、人物按境界、事件按元会、地理按空间层、概念按门类；其余类型仍是一层目录。
 TIERS = {
     "法宝": ("品阶", ("混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝", "功德灵宝")),
     "人物": ("境界", ("混沌",) + LEVEL_LADDER),
     "事件": ("元会", EVENT_ERAS),
     "地理": ("空间层", SPACE_LAYERS),
+    "概念": ("门类", CONCEPT_KINDS),
 }
 
 # 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13；功德灵宝追加 2026-11-15）：
@@ -434,7 +441,8 @@ def main() -> int:
     for kind_name, (field, allowed) in TIERS.items():
         counts = {}
         for _stem, (_rel, fm) in entries.items():
-            if fm.get("类型", "").strip() == kind_name:
+            # 只统计住在档位子目录里的条目：库根的索引页也声明为「概念」，但它没有门类。
+            if len(_rel.parts) >= 3 and fm.get("类型", "").strip() == kind_name:
                 v = fm.get(field, "").strip() or "（缺）"
                 counts[v] = counts.get(v, 0) + 1
         if counts:
