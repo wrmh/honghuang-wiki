@@ -138,6 +138,7 @@ def main():
 
         # 文件名带排序前缀（00-地图变迁.md）时，词条名应取 地图变迁
         ename = SORT_PREFIX.sub("", f.stem)
+        tail = lines[end:]        # 先取后段再裁剪：裁剪会改变下标
         lines[start + 1:end] = []
         new_body = [""]
         for q, opts in items:
@@ -153,7 +154,7 @@ def main():
                 new_body.append(f"  - {letter} {txt}")
         new_body.append("")
 
-        out = lines[:start + 1] + new_body + lines[end:]
+        out = lines[:start + 1] + new_body + tail
         new_text = "\n".join(out)
         if new_text != text and not args.check:
             write_lf(f, new_text)
