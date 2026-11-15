@@ -33,6 +33,7 @@ SUMMARY = ROOT / "概念" / "06-总览" / "未定稿问题.md"
 RANK = {"开天辟地": 0, "龙汉初劫": 1, "巫妖量劫": 2, "封神量劫": 3, "西游量劫": 4}
 
 HEADING = "## 未定稿问题"
+HEADING_RE = re.compile(r"^##\s*(?:[一二三四五六七八九十百]+、)?\s*未定稿问题\s*$")
 ITEM_RE = re.compile(r"^- \[ \]\s*(?:U-\d+\s+)?(.*\S)\s*$")
 # 条目下的缩进选项行：`  - A 选项文本`（A~Z 编号，用户选定后写回裁决）
 OPT_RE = re.compile(r"^\s+- ([A-Za-z])[\.、）)]?\s+(.*\S)\s*$")
@@ -63,7 +64,7 @@ def split_sections(text):
     lines = text.split("\n")
     start = None
     for i, ln in enumerate(lines):
-        if ln.strip() == HEADING:
+        if HEADING_RE.match(ln.strip()):
             start = i
             break
     if start is None:
