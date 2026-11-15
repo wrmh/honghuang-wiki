@@ -29,7 +29,7 @@ SKIP_DIRS = {"_模板", "tools", ".obsidian", ".git", "site", "node_modules", "_
 SKIP_FILES = {"README.md"}
 
 # 类型枚举 = 目录名枚举，两者必须一一对应
-TYPES = ("量劫", "人物", "势力", "法宝", "阵法", "地理", "功法", "事件", "概念")
+TYPES = ("人物", "势力", "法宝", "阵法", "地理", "功法", "事件", "概念")
 STATUSES = ("草稿", "待核", "成稿")
 
 # 人物境界阶梯（用户 2026-11-14 定稿）：目录名 = 境界值，两者一一对应。
@@ -198,6 +198,19 @@ def main() -> int:
         kind = fm.get("类型", "").strip()
         if kind and kind not in TYPES:
             errors.append(f"{rel}: 类型「{kind}」不在枚举内（{'/'.join(TYPES)}）")
+
+        # 量劫已并入「事件」（2026-11-15）：不再有单独的 量劫 类型，
+        # 一条事件靠 `劫序` 标明它在五大量劫里是第几劫（开天辟地是纪元，不算劫）。
+        seq = fm.get("劫序", "").strip()
+        if seq:
+            if not seq.isdigit() or not (1 <= int(seq) <= 4):
+                errors.append(
+                    f"{rel}: 「劫序」只能是 1-4（开天辟地是纪元、不算劫），现写「{seq}」"
+                )
+            if kind and kind != "事件":
+                errors.append(
+                    f"{rel}: 写了「劫序」就说明它是量劫，类型必须是「事件」（现写「{kind}」）"
+                )
 
         status = fm.get("状态", "").strip()
         if status and status not in STATUSES:

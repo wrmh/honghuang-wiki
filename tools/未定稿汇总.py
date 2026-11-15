@@ -21,9 +21,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# 编号按叙事顺序发：从开天往下读，先事件、再量劫、再人与势力、再器物阵法、
+# 编号按叙事顺序发：从开天往下读，先事件（含量劫）、再人与势力、再器物阵法、
 # 最后是统摄性的概念。目录枚举顺序变了不影响已有编号（编号靠哈希表锚定）。
-TYPE_DIRS = ("事件", "量劫", "人物", "势力", "阵法", "法宝", "地理", "功法", "概念")
+TYPE_DIRS = ("事件", "人物", "势力", "阵法", "法宝", "地理", "功法", "概念")
 MAP_FILE = ROOT / "tools" / "未定稿编号.json"
 ARCHIVE = ROOT / "tools" / "未定稿已结.json"
 SUMMARY = ROOT / "概念" / "未定稿问题.md"
