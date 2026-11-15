@@ -41,11 +41,16 @@ LEVEL_LADDER = (
 LEVEL_RANK = {name: i + 1 for i, name in enumerate(LEVEL_LADDER)}
 LEVEL_RANK["混沌"] = 0
 
+# 事件的元会坐标（一元 = 12 会 = 129600 年，是对账周期）。
+# 开天辟地归入第一元会（它是纪元起点，没有「第零元会」这种东西）。
+EVENT_ERAS = ("第一元会", "第二元会", "第三元会", "第四元会", "第五元会", "第六元会")
+
 # 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
-# 法宝按品阶分，人物按境界分；其余类型仍是一层目录。
+# 法宝按品阶分，人物按境界分，事件按元会分；其余类型仍是一层目录。
 TIERS = {
     "法宝": ("品阶", ("混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝", "功德灵宝")),
     "人物": ("境界", ("混沌",) + LEVEL_LADDER),
+    "事件": ("元会", EVENT_ERAS),
 }
 
 # 法宝的「系列 × 禁制」二级校验（裁决 2026-11-13；功德灵宝追加 2026-11-15）：
@@ -222,14 +227,16 @@ def main() -> int:
                     )
                 else:
                     sub = rel.parts[1]
-                    if sub not in allowed:
+                    # 允许「01-第一元会」这类排序前缀：目录名去掉前缀后再比对
+                    sub_key = SORT_PREFIX.sub("", sub)
+                    if sub_key not in allowed:
                         errors.append(
                             f"{rel}: 档位目录「{sub}」不在枚举内（{'/'.join(allowed)}）"
                         )
-                    elif fm.get(field, "").strip() != sub:
+                    elif fm.get(field, "").strip() != sub_key:
                         errors.append(
                             f"{rel}: 档位「{fm.get(field, '（缺）')}」（{field} 字段）"
-                            f"与所在档位目录「{sub}」不符"
+                            f"与所在档位目录「{sub_key}」不符"
                         )
             elif top == "势力":
                 if depth < 3:
