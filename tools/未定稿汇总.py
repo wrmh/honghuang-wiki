@@ -116,12 +116,16 @@ def main():
 
     id_map = load_map()
     archive = load_archive()
-    archived = [
-        r for r in archive.get("rulings", []) if ID_RE.match(str(r.get("id", "")))
-    ]
+    # 归档里的 id 允许写成「554A」这种带裁决字母的形式：只取前面的 U-554，
+    # 否则会被当成非法编号跳过，导致已裁决的号被重新发给新问题（号不回收被破坏）。
+    def _norm(rid):
+        m = re.match(r"^(U-\d{3})", str(rid or "").strip())
+        return m.group(1) if m else None
+
+    archived = [r for r in archive.get("rulings", []) if _norm(r.get("id"))]
     used = {v for v in id_map.values() if isinstance(v, str) and ID_RE.match(v)}
     # 归档里的编号也算「已用」，否则 closed 的号会被重新发给新问题
-    used |= {r["id"] for r in archived}
+    used |= {_norm(r["id"]) for r in archived}
     next_id = 1 + max((int(ID_RE.match(v).group(1)) for v in used), default=0)
 
     rows = []          # (id, entry_name, question)
