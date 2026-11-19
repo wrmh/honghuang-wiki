@@ -38,6 +38,13 @@ LEVEL_LADDER = (
     "凡人", "引气入体", "炼气化神", "炼神返虚", "炼虚合道",
     "地仙", "天仙", "玄仙", "金仙", "太乙金仙", "大罗金仙", "准圣", "圣人",
 )
+
+# 人物必须带的字段（用户 2026-11-19 定）：外貌与外貌标签先占位，内容可空；
+# 三视角评价 + 1-3 个标签；法宝要带类型占位；功法/神通/亲近/仇视有就写、没有可空。
+PERSON_KEYS = (
+    "外貌", "外貌标签", "评价自视", "评价亲近", "评价旁人", "人物标签",
+    "法宝", "功法", "神通", "亲近之人", "仇视之人",
+)
 LEVEL_RANK = {name: i + 1 for i, name in enumerate(LEVEL_LADDER)}
 LEVEL_RANK["混沌"] = 0
 
@@ -425,6 +432,20 @@ def main() -> int:
                 )
             elif "→" not in timeline:
                 errors.append(f"{rel}: 「时间线」要用 → 连成链（生 → 节点 → 终）")
+            # 三视角评价 / 标签 / 器物 / 人我：字段必须存在（内容允许空＝占位），标签 1-3 个
+            for key in PERSON_KEYS:
+                if key not in fm:
+                    errors.append(f"{rel}: 缺「{key}」字段（有就写，没有可留空，但不能缺字段）")
+            tags = [t for t in re.split(r"[、,，;；/]", fm.get("人物标签", "")) if t.strip()]
+            if len(tags) > 3:
+                errors.append(f"{rel}: 「人物标签」最多三个，现有 {len(tags)} 个")
+            if "人物标签" in fm and not tags:
+                errors.append(f"{rel}: 「人物标签」不能空（评价三视角至少能推出一个）")
+            arts = fm.get("法宝", "").strip()
+            if "本命法宝" in fm:
+                errors.append(f"{rel}: 「本命法宝」已并入「法宝」（法宝要带类型占位）")
+            if arts and "（类型：" not in arts:
+                errors.append(f"{rel}: 「法宝」要标注类型占位，如 番天印（类型：待定）")
 
         entries[path.stem] = (rel, fm)
 
