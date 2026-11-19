@@ -212,6 +212,15 @@ def main() -> int:
             errors.append(f"{rel}: 缺头信息（文件必须以 --- 开头，并用 --- 收尾）")
             continue
 
+        # YAML 里以 * & ! 开头的裸值会被当成别名/锚点/标签，Obsidian 直接判「无效属性」
+        for _ln in text.split("---", 2)[1].splitlines():
+            _m = __import__("re").match(r"^([^\s:#][^:]*):\s(.*)$", _ln)
+            if _m and _m.group(2)[:1] in ("*", "&", "!"):
+                errors.append(
+                    f"{rel}: 头信息「{_m.group(1)}」的值以 {_m.group(2)[0]} 开头，"
+                    f"YAML 会把它当别名/锚点/标签解析（Obsidian 判「无效属性」）——请给值加引号"
+                )
+                break
         missing = [k for k in REQUIRED if not fm.get(k, "").strip()]
         if missing:
             errors.append(f"{rel}: 缺必填字段 {'、'.join(missing)}")
