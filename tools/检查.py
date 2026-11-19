@@ -31,6 +31,9 @@ SKIP_FILES = {"README.md"}
 # 类型枚举 = 目录名枚举，两者必须一一对应
 TYPES = ("人物", "势力", "法宝", "阵法", "地理", "功法", "事件", "概念", "原创设定")
 
+# 势力第一层：按「它是哪一类」分（人 / 妖 / 仙 / 神 / 巫 / 佛 / 鬼 / 先天）
+FACTION_CLASSES = ("人", "妖", "仙", "神", "巫", "佛", "鬼", "先天")
+
 # 原创设定层（2026-11-19 立）：独立于洪荒正史，供二次创作使用（好感度/天赋/关系）。
 # 分层暂定为 总览 / 规则 / 天赋 / 关系，后面会长出 道具、事件、门派 等。
 ORIGINAL_LAYERS = ("总览", "规则", "天赋", "关系", "玩法")
@@ -191,9 +194,9 @@ def main() -> int:
     moe_first_level = {
         p.stem
         for p in files
-        if len(p.relative_to(root).parts) == 3
+        if len(p.relative_to(root).parts) == 4
         and p.relative_to(root).parts[0] == "势力"
-        and p.stem == p.relative_to(root).parts[1]
+        and p.stem == p.relative_to(root).parts[2]
     }
 
     for path in files:
@@ -319,17 +322,23 @@ def main() -> int:
                         f"即 {top}\\<档位>\\{path.name}"
                     )
             elif top == "势力":
-                if depth < 3:
+                if depth < 4:
                     errors.append(
-                        f"{rel}: 势力本体也要放进同名目录（第二层），"
-                        f"即 势力\\{path.stem}\\{path.name}"
+                        f"{rel}: 势力要先分「类」，再进同名目录："
+                        f"势力\\<类>\\<大势力>\\<大势力>.md"
+                        f"（类 = {'/'.join(FACTION_CLASSES)}）"
                     )
-                elif depth > 4:
+                elif depth > 5:
                     errors.append(
-                        f"{rel}: 势力最多两层（势力\\<大势力>\\<大势力>.md 与 "
-                        f"势力\\<大势力>\\[<组>\\]<子条目>.md）"
+                        f"{rel}: 势力最多三层（势力\\<类>\\<大势力>\\<大势力>.md 与 "
+                        f"势力\\<类>\\<大势力>\\[<组>\\]<子条目>.md）"
                     )
-                elif path.stem == rel.parts[1]:
+                elif rel.parts[1] not in FACTION_CLASSES:
+                    errors.append(
+                        f"{rel}: 势力类目录「{rel.parts[1]}」不在枚举内"
+                        f"（{'/'.join(FACTION_CLASSES)}）"
+                    )
+                elif path.stem == rel.parts[2]:
                     # 大势力本体（第二层）
                     if fm.get("归属", "").strip():
                         errors.append(
@@ -343,10 +352,10 @@ def main() -> int:
                             f"不够就别单独成条，挂到上级势力下"
                         )
                 else:
-                    parent = rel.parts[1]
+                    parent = rel.parts[2]
                     if parent not in moe_first_level:
                         errors.append(
-                            f"{rel}: 挂在「{parent}」下，但 势力\\{parent}\\{parent}.md 不存在"
+                            f"{rel}: 挂在「{parent}」下，但 势力\\{rel.parts[1]}\\{parent}\\{parent}.md 不存在"
                             f"——大势力本体必须先立条"
                         )
                     if fm.get("归属", "").strip() != parent:
@@ -431,6 +440,20 @@ def main() -> int:
                 errors.append(f"{rel}: 缺「境界备注」（写具体身份，如 祖巫（肉身成圣））")
             # 时间线：人物必须写清「生 → 关键节点 → 终」，防止把不同元会的人写进同一场戏
             timeline = fm.get("时间线", "").strip()
+        # 妖族：必须写「妖身状态」字段与正文「## 妖身」一节
+        race = fm.get("种族", "").strip()
+        if "妖" in race:
+            if not fm.get("妖身状态", "").strip():
+                errors.append(
+                    f"{rel}: 种族含「妖」，必须写「妖身状态」字段"
+                    f"（形态 / 尺寸 / 现状 / 要害，一行说清）"
+                )
+            if "## 妖身" not in body:
+                errors.append(
+                    f"{rel}: 种族含「妖」，正文必须有「## 妖身」一节"
+                    f"（现形只在特定场合，且要写清状态）"
+                )
+
             if not timeline:
                 errors.append(
                     f"{rel}: 缺「时间线」字段（格式：第一元会生 → 第三元会初射十乌 → 战死）"
