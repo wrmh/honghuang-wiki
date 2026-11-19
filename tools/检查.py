@@ -417,6 +417,14 @@ def main() -> int:
                             )
             if not fm.get("境界备注", "").strip():
                 errors.append(f"{rel}: 缺「境界备注」（写具体身份，如 祖巫（肉身成圣））")
+            # 时间线：人物必须写清「生 → 关键节点 → 终」，防止把不同元会的人写进同一场戏
+            timeline = fm.get("时间线", "").strip()
+            if not timeline:
+                errors.append(
+                    f"{rel}: 缺「时间线」字段（格式：第一元会生 → 第三元会初射十乌 → 战死）"
+                )
+            elif "→" not in timeline:
+                errors.append(f"{rel}: 「时间线」要用 → 连成链（生 → 节点 → 终）")
 
         entries[path.stem] = (rel, fm)
 
