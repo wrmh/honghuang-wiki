@@ -1,0 +1,12 @@
+{
+  "types": {
+    "别名": "aliases",
+    "aliases": "aliases",
+    "标签": "tags",
+    "亲近之人": "multitext",
+    "仇视之人": "multitext",
+    "门类序": "number",
+    "空间层序": "number",
+    "禁制": "number"
+  }
+}
