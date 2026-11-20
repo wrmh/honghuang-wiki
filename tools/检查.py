@@ -49,6 +49,8 @@ LEVEL_LADDER = (
 # 人物必须带的字段（用户 2026-11-19 定）：外貌与外貌标签先占位，内容可空；
 # 三视角评价 + 1-3 个标签；法宝要带类型占位；功法/神通/亲近/仇视有就写、没有可空。
 ELEM_YES: list[str] = []
+EV_YES: list[str] = []
+EV_NO: list[str] = []
 ELEM_NO: list[str] = []
 PERSON_KEYS = (
     "外貌", "外貌标签", "评价自视", "评价亲近", "评价旁人", "人物标签",
@@ -465,6 +467,27 @@ def main() -> int:
                 ELEM_NO.append(rel)
             # 时间线：人物必须写清「生 → 关键节点 → 终」，防止把不同元会的人写进同一场戏
             timeline = fm.get("时间线", "").strip()
+            if not timeline:
+                errors.append(
+                    f"{rel}: 缺「时间线」字段（格式：第一元会生 → 第三元会初射十乌 → 战死）"
+                )
+            elif "→" not in timeline:
+                errors.append(f"{rel}: 「时间线」要用 → 连成链（生 → 节点 → 终）")
+            # 三视角评价 / 标签 / 器物 / 人我：字段必须存在（内容允许空＝占位），标签 1-3 个
+            for key in PERSON_KEYS:
+                if key not in fm:
+                    errors.append(f"{rel}: 缺「{key}」字段（有就写，没有可留空，但不能缺字段）")
+            tags = [x for x in re.split(r"[、,，;；/]", fm.get("人物标签", "")) if x.strip()]
+            if len(tags) > 3:
+                errors.append(f"{rel}: 「人物标签」最多三个，现有 {len(tags)} 个")
+            if "人物标签" in fm and not tags:
+                errors.append(f"{rel}: 「人物标签」不能空（评价三视角至少能推出一个）")
+            arts = fm.get("法宝", "").strip()
+            if "本命法宝" in fm:
+                errors.append(f"{rel}: 「本命法宝」已并入「法宝」（法宝要带类型占位）")
+            if arts and "（类型：" not in arts:
+                errors.append(f"{rel}: 「法宝」要标注类型占位，如 番天印（类型：待定）")
+
         # 妖族：必须写「妖身状态」字段与正文「## 妖身」一节
         race = fm.get("种族", "").strip()
         if "妖" in race:
@@ -479,26 +502,23 @@ def main() -> int:
                     f"（现形只在特定场合，且要写清状态）"
                 )
 
-            if not timeline:
+        # 事件：必须写「事件要素」十项（史书式·时段大事记录）
+        if kind == "事件":
+            if "## 事件要素" in body:
+                seg = body.split("## 事件要素", 1)[1]
+                seg = re.split(r"\n## ", seg)[0]
+                n_ev = len(re.findall(r"^### ", seg, re.M))
+                if n_ev < 10:
+                    errors.append(
+                        f"{rel}: 「事件要素」要写满十项（一、时间 … 十、关联），现有 {n_ev} 项"
+                    )
+                EV_YES.append(rel)
+            else:
                 errors.append(
-                    f"{rel}: 缺「时间线」字段（格式：第一元会生 → 第三元会初射十乌 → 战死）"
+                    f"{rel}: 事件必须写「## 事件要素」十项"
+                    f"（时间/地点/主体/事由/经过/结果/影响/史料备注/定性/关联）"
                 )
-            elif "→" not in timeline:
-                errors.append(f"{rel}: 「时间线」要用 → 连成链（生 → 节点 → 终）")
-            # 三视角评价 / 标签 / 器物 / 人我：字段必须存在（内容允许空＝占位），标签 1-3 个
-            for key in PERSON_KEYS:
-                if key not in fm:
-                    errors.append(f"{rel}: 缺「{key}」字段（有就写，没有可留空，但不能缺字段）")
-            tags = [t for t in re.split(r"[、,，;；/]", fm.get("人物标签", "")) if t.strip()]
-            if len(tags) > 3:
-                errors.append(f"{rel}: 「人物标签」最多三个，现有 {len(tags)} 个")
-            if "人物标签" in fm and not tags:
-                errors.append(f"{rel}: 「人物标签」不能空（评价三视角至少能推出一个）")
-            arts = fm.get("法宝", "").strip()
-            if "本命法宝" in fm:
-                errors.append(f"{rel}: 「本命法宝」已并入「法宝」（法宝要带类型占位）")
-            if arts and "（类型：" not in arts:
-                errors.append(f"{rel}: 「法宝」要标注类型占位，如 番天印（类型：待定）")
+                EV_NO.append(rel)
 
         entries[path.stem] = (rel, fm)
 
@@ -589,6 +609,7 @@ def main() -> int:
     print(f"扫描词条 {len(entries)} 篇，引用 {sum(refs.values())} 处，指向 {len(refs)} 个词条")
     print("分类分布  " + "  ".join(f"{t}{n}" for t, n in dist.items() if n))
     print(f"人物要素  已写 {len(ELEM_YES)} 篇 / 待补 {len(ELEM_NO)} 篇")
+    print(f"事件要素  已写 {len(EV_YES)} 篇 / 待补 {len(EV_NO)} 篇")
     for kind_name, (field, allowed) in TIERS.items():
         counts = {}
         for _stem, (_rel, fm) in entries.items():
