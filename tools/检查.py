@@ -488,6 +488,10 @@ def main() -> int:
                     errors.append(f"{rel}: 「攻略」只能是 可攻略/不可攻略，现为「{guide}」")
                 elif guide == "可攻略":
                     GUIDE_YES.append(rel)
+                    if emotion == "已婚":
+                        errors.append(
+                            f"{rel}: 「已婚」不能是「可攻略」——名分已落定的不能再进后宫线（用户 2026-11-21 纠错）"
+                        )
                 else:
                     GUIDE_NO.append(rel)
                     if emotion != "已婚":
