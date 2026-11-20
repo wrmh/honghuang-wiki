@@ -48,6 +48,8 @@ LEVEL_LADDER = (
 
 # 人物必须带的字段（用户 2026-11-19 定）：外貌与外貌标签先占位，内容可空；
 # 三视角评价 + 1-3 个标签；法宝要带类型占位；功法/神通/亲近/仇视有就写、没有可空。
+ELEM_YES: list[str] = []
+ELEM_NO: list[str] = []
 PERSON_KEYS = (
     "外貌", "外貌标签", "评价自视", "评价亲近", "评价旁人", "人物标签",
     "法宝", "功法", "神通", "亲近之人", "仇视之人",
@@ -447,6 +449,20 @@ def main() -> int:
                             )
             if not fm.get("境界备注", "").strip():
                 errors.append(f"{rel}: 缺「境界备注」（写具体身份，如 祖巫（肉身成圣））")
+            # 人物要素：用户 2026-11-20 定的八项清单（基础标识/外貌体征/性格气质/身份背景/
+            # 能力喜好/言行特征/状态与关系/补充标签）。有了就必须写满八项；暂不强制全员补齐。
+            if "## 人物要素" in body:
+                elem = body.split("## 人物要素", 1)[1]
+                elem = re.split(r"\n## ", elem)[0]
+                n_elem = len(re.findall(r"^### ", elem, re.M))
+                if n_elem < 8:
+                    errors.append(
+                        f"{rel}: 「人物要素」要写满八项"
+                        f"（一、基础标识 … 八、补充标签），现有 {n_elem} 项"
+                    )
+                ELEM_YES.append(rel)
+            else:
+                ELEM_NO.append(rel)
             # 时间线：人物必须写清「生 → 关键节点 → 终」，防止把不同元会的人写进同一场戏
             timeline = fm.get("时间线", "").strip()
         # 妖族：必须写「妖身状态」字段与正文「## 妖身」一节
@@ -572,6 +588,7 @@ def main() -> int:
     print(f"词库自检  {root}")
     print(f"扫描词条 {len(entries)} 篇，引用 {sum(refs.values())} 处，指向 {len(refs)} 个词条")
     print("分类分布  " + "  ".join(f"{t}{n}" for t, n in dist.items() if n))
+    print(f"人物要素  已写 {len(ELEM_YES)} 篇 / 待补 {len(ELEM_NO)} 篇")
     for kind_name, (field, allowed) in TIERS.items():
         counts = {}
         for _stem, (_rel, fm) in entries.items():
