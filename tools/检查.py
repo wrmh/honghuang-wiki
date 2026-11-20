@@ -51,6 +51,8 @@ LEVEL_LADDER = (
 ELEM_YES: list[str] = []
 EV_YES: list[str] = []
 EV_NO: list[str] = []
+GUIDE_YES: list[str] = []
+GUIDE_NO: list[str] = []
 ELEM_NO: list[str] = []
 PERSON_KEYS = (
     "外貌", "外貌标签", "评价自视", "评价亲近", "评价旁人", "人物标签",
@@ -475,6 +477,21 @@ def main() -> int:
                 )
             elif "→" not in timeline:
                 errors.append(f"{rel}: 「时间线」要用 → 连成链（生 → 节点 → 终）")
+            # 可攻略性（用户 2026-11-21 定）：原创设定层的后宫/姻缘线必须先在这里标清楚，
+            # 免得同一个角色在人物页与名录页说法不一。
+            emotion = fm.get("情感状态", "").strip()
+            if emotion and emotion not in ("单身", "已婚"):
+                errors.append(f"{rel}: 「情感状态」只能是 单身/已婚，现为「{emotion}」")
+            guide = fm.get("攻略", "").strip()
+            if guide:
+                if guide not in ("可攻略", "不可攻略"):
+                    errors.append(f"{rel}: 「攻略」只能是 可攻略/不可攻略，现为「{guide}」")
+                elif guide == "可攻略":
+                    GUIDE_YES.append(rel)
+                else:
+                    GUIDE_NO.append(rel)
+                    if emotion != "已婚":
+                        errors.append(f"{rel}: 「不可攻略」必须是「情感状态: 已婚」（有归属才不可攻略）")
             # 三视角评价 / 标签 / 器物 / 人我：字段必须存在（内容允许空＝占位），标签 1-3 个
             for key in PERSON_KEYS:
                 if key not in fm:
@@ -611,6 +628,7 @@ def main() -> int:
     print(f"扫描词条 {len(entries)} 篇，引用 {sum(refs.values())} 处，指向 {len(refs)} 个词条")
     print("分类分布  " + "  ".join(f"{t}{n}" for t, n in dist.items() if n))
     print(f"人物要素  已写 {len(ELEM_YES)} 篇 / 待补 {len(ELEM_NO)} 篇")
+    print(f"可攻略性  可攻略 {len(GUIDE_YES)} 篇 / 不可攻略 {len(GUIDE_NO)} 篇")
     print(f"事件要素  已写 {len(EV_YES)} 篇 / 待补 {len(EV_NO)} 篇")
     for kind_name, (field, allowed) in TIERS.items():
         counts = {}
