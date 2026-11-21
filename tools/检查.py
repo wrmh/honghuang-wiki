@@ -34,6 +34,12 @@ TYPES = ("人物", "势力", "法宝", "阵法", "地理", "功法", "事件", "
 # 势力第一层：按「它是哪一类」分（人 / 妖 / 仙 / 神 / 巫 / 佛 / 鬼 / 先天）
 FACTION_CLASSES = ("人", "妖", "仙", "神", "巫", "佛", "鬼", "先天")
 
+# 人物第二层：大势力（用户 2026-11-21 定）——人物\<境界>\<大势力>\<词条>.md
+# 值与 `势力\` 下的大势力目录同名；没有门派的（散修、散妖、开天之前的存在）统一进「无门」。
+FACTION_DIRS = ("佛门", "天庭", "地府", "人族", "巫族", "阐教", "截教", "妖族天庭",
+                "龙族", "凤族", "麒麟族", "九尾", "混沌魔神", "先天灵兽", "洪荒凶兽",
+                "混世四猴", "三教", "无门")
+
 # 原创设定层（2026-11-19 立）：独立于洪荒正史，供二次创作使用（好感度/天赋/关系）。
 # 分层暂定为 总览 / 规则 / 天赋 / 关系，后面会长出 道具、事件、门派 等。
 ORIGINAL_LAYERS = ("总览", "规则", "天赋", "关系", "玩法", "伏笔")
@@ -381,6 +387,35 @@ def main() -> int:
                 errors.append(
                     f"{rel}: 类型「{kind}」与所在目录「{top}」不符，按类型目录约定应放在 {kind}\\"
                 )
+            elif top == "人物":
+                # 人物两层：境界 → 大势力（用户 2026-11-21 定）
+                #   人物\<境界>\<大势力>\<词条>.md
+                ladder = ("混沌",) + LEVEL_LADDER
+                if depth != 4:
+                    errors.append(
+                        f"{rel}: 人物要先分境界、再分大势力："
+                        f"人物\\<境界>\\<大势力>\\{path.name}（境界 = {'/'.join(ladder)}）"
+                    )
+                else:
+                    lv, fac = rel.parts[1], rel.parts[2]
+                    if lv not in ladder:
+                        errors.append(
+                            f"{rel}: 境界目录「{lv}」不在阶梯内（{'/'.join(ladder)}）"
+                        )
+                    elif fm.get("境界", "").strip() != lv:
+                        errors.append(
+                            f"{rel}: 境界「{fm.get('境界', '（缺）')}」（境界 字段）"
+                            f"与所在境界目录「{lv}」不符"
+                        )
+                    if fac not in FACTION_DIRS:
+                        errors.append(
+                            f"{rel}: 大势力目录「{fac}」不在枚举内（{'/'.join(FACTION_DIRS)}）"
+                        )
+                    elif fm.get("势力", "").strip() != fac:
+                        errors.append(
+                            f"{rel}: 势力「{fm.get('势力', '（缺）')}」（势力 字段）"
+                            f"与所在大势力目录「{fac}」不符——人物要写成 人物\\{lv}\\{fac}\\{path.name}"
+                        )
             elif top in TIERS:
                 field, allowed = TIERS[top]
                 if depth == 3:
