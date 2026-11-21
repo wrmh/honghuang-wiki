@@ -80,7 +80,7 @@ CONCEPT_RANK = {name: i for i, name in enumerate(CONCEPT_KINDS)}
 # 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
 # 法宝按品阶、人物按境界、事件按元会、地理按空间层、概念按门类；其余类型仍是一层目录。
 TIERS = {
-    "法宝": ("品阶", ("混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝", "功德灵宝")),
+    "法宝": ("品阶", ("凡器", "混沌至宝", "混沌灵宝", "先天至宝", "先天灵宝", "后天至宝", "后天灵宝", "功德灵宝")),
     "人物": ("境界", ("混沌",) + LEVEL_LADDER),
     "事件": ("元会", EVENT_ERAS),
     "地理": ("空间层", SPACE_LAYERS),
@@ -105,6 +105,11 @@ GRADES = tuple(g for _, _, g in GRADE_BANDS) + ("至宝", "功德灵宝")
 EXEMPT_TAG = "分类条目"
 # 先天功德至宝系列仍属先天，但按「功德至宝统一归档」的约定收在 后天至宝/ 目录下 → 豁免系列校验
 EXEMPT_SERIES_TAG = "先天功德至宝"
+
+# 凡器（2026-11-21 用户新增）：凡人与低修为者、穷散修用的兵器。
+# 它们没有禁制，所以**不在这把「系列 × 禁制」的尺子上**——0 不是最低档，是不进档。
+# 凡器改按「器类」分类，这套词是给整个词库的兵器用的，法宝里的兵器也可参照。
+WEAPON_CLASSES = ("长兵", "短兵", "抛射", "软兵", "农具改", "护具")
 
 # 至宝档的精确禁制数：混沌至宝 50 道，先天/后天至宝 49 道
 TIER_EXACT = {"混沌至宝": 50, "先天至宝": 49, "后天至宝": 49}
@@ -477,52 +482,67 @@ def main() -> int:
             series = fm.get("系列", "").strip()
             grade = fm.get("品级", "").strip()
             raw_num = fm.get("禁制", "").strip()
-            want_series = SERIES_OF_TIER.get(tier)
-            if not series:
-                errors.append(f"{rel}: 缺「系列」字段（混沌/先天/后天）")
-            elif want_series and series != want_series and EXEMPT_SERIES_TAG not in fm.get("标签", ""):
-                errors.append(
-                    f"{rel}: 系列「{series}」与品阶「{tier}」不符，应为「{want_series}」"
-                )
-            if not raw_num:
-                errors.append(f"{rel}: 缺「禁制」字段（灵宝 1-48 道，至宝 49 道；混沌至宝 50 道）")
+
+            # 凡器：没有禁制、不进系列×禁制体系，改用手艺式的「器类」分类
+            if tier == "凡器":
+                if fm.get("禁制", "").strip() != "0":
+                    errors.append(f"{rel}: 凡器没有禁制，`禁制` 必须写 0（0 不是最低档，是不进档）")
+                if series != "凡":
+                    errors.append(f"{rel}: 凡器的 `系列` 必须写「凡」")
+                if grade != "凡":
+                    errors.append(f"{rel}: 凡器的 `品级` 必须写「凡」")
+                _cls = fm.get("器类", "").strip()
+                if not _cls:
+                    errors.append(f"{rel}: 凡器必须写「器类」（{'/'.join(WEAPON_CLASSES)}）")
+                elif _cls not in WEAPON_CLASSES:
+                    errors.append(f"{rel}: 器类「{_cls}」不在枚举内（{'/'.join(WEAPON_CLASSES)}）")
             else:
-                try:
-                    num = int(raw_num)
-                except ValueError:
-                    errors.append(f"{rel}: 禁制「{raw_num}」不是整数")
+                want_series = SERIES_OF_TIER.get(tier)
+                if not series:
+                    errors.append(f"{rel}: 缺「系列」字段（混沌/先天/后天）")
+                elif want_series and series != want_series and EXEMPT_SERIES_TAG not in fm.get("标签", ""):
+                    errors.append(
+                        f"{rel}: 系列「{series}」与品阶「{tier}」不符，应为「{want_series}」"
+                    )
+                if not raw_num:
+                    errors.append(f"{rel}: 缺「禁制」字段（灵宝 1-48 道，至宝 49 道；混沌至宝 50 道）")
                 else:
-                    want_grade = grade_of(num, series)
-                    if want_grade is None:
-                        errors.append(f"{rel}: 禁制 {num} 超出 1-50 范围")
-                    elif not grade:
-                        errors.append(f"{rel}: 缺「品级」字段（下品/中品/上品/极品/功德灵宝/至宝）")
-                    elif grade not in GRADES:
-                        errors.append(
-                            f"{rel}: 品级「{grade}」不在枚举内（{'/'.join(GRADES)}）"
-                        )
-                    elif grade != want_grade:
-                        errors.append(
-                            f"{rel}: 品级「{grade}」与 {num} 道禁制不匹配，应为「{want_grade}」"
-                        )
-                    exact = TIER_EXACT.get(tier)
-                    if exact is not None and num != exact:
-                        errors.append(
-                            f"{rel}: 品阶「{tier}」须为 {exact} 道禁制，现写 {num}"
-                        )
-                    if tier == "后天灵宝" and num > CRAFT_CAP["后天灵宝"]:
-                        errors.append(
-                            f"{rel}: 后天灵宝炼制上限 {CRAFT_CAP['后天灵宝']} 道，现写 {num}；"
-                            f"43-48 道请归「功德灵宝」（靠功德顶上）"
-                        )
-                    if tier == "功德灵宝" and not (43 <= num <= 48):
-                        errors.append(
-                            f"{rel}: 「功德灵宝」须为 43-48 道，现写 {num}（后天灵宝 1-42，后天至宝 49）"
-                        )
-                    if tier.endswith("灵宝") and num > 48:
-                        errors.append(
-                            f"{rel}: {num} 道禁制已是至宝档（49/50），不能再算「{tier}」"
-                        )
+                    try:
+                        num = int(raw_num)
+                    except ValueError:
+                        errors.append(f"{rel}: 禁制「{raw_num}」不是整数")
+                    else:
+                        want_grade = grade_of(num, series)
+                        if want_grade is None:
+                            errors.append(f"{rel}: 禁制 {num} 超出 1-50 范围")
+                        elif not grade:
+                            errors.append(f"{rel}: 缺「品级」字段（下品/中品/上品/极品/功德灵宝/至宝）")
+                        elif grade not in GRADES:
+                            errors.append(
+                                f"{rel}: 品级「{grade}」不在枚举内（{'/'.join(GRADES)}）"
+                            )
+                        elif grade != want_grade:
+                            errors.append(
+                                f"{rel}: 品级「{grade}」与 {num} 道禁制不匹配，应为「{want_grade}」"
+                            )
+                        exact = TIER_EXACT.get(tier)
+                        if exact is not None and num != exact:
+                            errors.append(
+                                f"{rel}: 品阶「{tier}」须为 {exact} 道禁制，现写 {num}"
+                            )
+                        if tier == "后天灵宝" and num > CRAFT_CAP["后天灵宝"]:
+                            errors.append(
+                                f"{rel}: 后天灵宝炼制上限 {CRAFT_CAP['后天灵宝']} 道，现写 {num}；"
+                                f"43-48 道请归「功德灵宝」（靠功德顶上）"
+                            )
+                        if tier == "功德灵宝" and not (43 <= num <= 48):
+                            errors.append(
+                                f"{rel}: 「功德灵宝」须为 43-48 道，现写 {num}（后天灵宝 1-42，后天至宝 49）"
+                            )
+                        if tier.endswith("灵宝") and num > 48:
+                            errors.append(
+                                f"{rel}: {num} 道禁制已是至宝档（49/50），不能再算「{tier}」"
+                            )
 
         # 人物：境界必须在阶梯内，境界序必须与境界一致（给 Dataview 排序用）
         if kind == "人物":
