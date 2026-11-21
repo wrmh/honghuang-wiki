@@ -313,6 +313,21 @@ def main() -> int:
                     f"{rel}: 头信息「{_m.group(1)}」的值以 {_m.group(2)[0]} 开头，"
                     f"YAML 会把它当别名/锚点/标签解析（Obsidian 判「无效属性」）——请给值加引号"
                 )
+
+        # 重复键：PyYAML 取最后一次、不报错，但 Obsidian 会把整块属性显示成「无效属性」。
+        # 2026-11-21 一次批量生成 12 篇就栽在这里（生成器把 别名/标签 写了两遍）。
+        _seen_keys = {}
+        for _ln in text.split("---", 2)[1].splitlines():
+            _m = __import__("re").match(r"^([^\s:#][^:]*):", _ln)
+            if _m:
+                _seen_keys.setdefault(_m.group(1), 0)
+                _seen_keys[_m.group(1)] += 1
+        for _k, _n in _seen_keys.items():
+            if _n > 1:
+                errors.append(
+                    f"{rel}: 头信息里「{_k}」写了 {_n} 遍（YAML 取最后一次、不报错，"
+                    f"但 Obsidian 会整块判「无效属性」）——删掉多余的行"
+                )
                 break
         missing = [k for k in REQUIRED if not fm.get(k, "").strip()]
         if missing:
