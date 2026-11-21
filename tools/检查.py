@@ -194,6 +194,64 @@ def main() -> int:
     entries: dict[str, tuple[Path, dict]] = {}
     refs: dict[str, int] = {}
 
+    # 模板自检：_模板\ 在 SKIP_DIRS 里，所以模板本身从来没被校验过——
+    # 而模板一错，照它新建的每一篇都会错（收尾 --- 粘在最后一行 = 整块头信息非法，
+    # Obsidian 把这条词条的所有属性都判「无效」）。第 15 条硬规矩就是为这个立的。
+    tpl_dir = root / "_模板"
+    if tpl_dir.is_dir():
+        for tpl in sorted(tpl_dir.glob("*.md")):
+            tpath = tpl.relative_to(root)
+            try:
+                ttext = tpl.read_text(encoding="utf-8-sig")
+            except UnicodeDecodeError:
+                errors.append(f"{tpath}: 不是 UTF-8 编码，请另存为 UTF-8")
+                continue
+            if not ttext.startswith("---"):
+                errors.append(f"{tpath}: 模板必须以 --- 开头")
+                continue
+            if not __import__("re").search(r"\n---\n", ttext):
+                errors.append(
+                    f"{tpath}: 模板头信息收尾的 --- 必须独占一行"
+                    "（粘在最后一个字段后面会让照它新建的词条整块判「无效属性」）"
+                )
+            tdict: dict = {}
+            try:
+                import yaml as _yaml
+
+                try:
+                    tdict = _yaml.safe_load(ttext.split("---", 2)[1]) or {}
+                except Exception as _e:  # noqa: BLE001
+                    _first = [x for x in str(_e).splitlines() if x.strip()][:3]
+                    errors.append(
+                        f"{tpath}: 模板头信息不是合法 YAML（照它新建的词条会整块判「无效属性」）："
+                        + " / ".join(_first)
+                    )
+                    continue
+            except ImportError:
+                pass
+            if not isinstance(tdict, dict):
+                errors.append(f"{tpath}: 模板头信息必须是键值对")
+                continue
+            _tpl_need = {
+                "人物": ["词条", "类型", "状态", "别名", "aliases", "势力", "境界", "境界序",
+                         "境界备注", "首次登场", "时间线", "外貌", "外貌标签", "评价自视",
+                         "评价亲近", "评价旁人", "人物标签", "法宝", "功法", "神通",
+                         "亲近之人", "仇视之人"],
+                "事件": ["词条", "类型", "元会", "元会序", "劫序", "归属", "时间锚点",
+                         "时间精度", "定性", "状态"],
+                "法宝": ["词条", "类型", "状态", "品阶", "系列", "禁制", "品级"],
+            }.get(tpl.stem)
+            if _tpl_need:
+                _lack = [k for k in _tpl_need if k not in tdict]
+                if _lack:
+                    errors.append(f"{tpath}: 模板缺字段 {'、'.join(_lack)}（硬规矩第 15 条：先改模板再改存量）")
+            if tpl.stem == "事件":
+                for _sec in ("### 一、时间", "### 二、地点", "### 三、主体", "### 四、事由",
+                             "### 五、经过", "### 六、结果", "### 七、影响", "### 八、史料备注",
+                             "### 九、定性", "### 十、关联"):
+                    if _sec not in ttext:
+                        errors.append(f"{tpath}: 事件模板缺小节 {_sec}")
+
     # 势力公约：只有「金字塔结构完整的组织」才单独成条，而且**本体也要放进同名目录**
     #   势力\<大势力>\<大势力>.md        本体（第二层，front matter 不写「归属」）
     #   势力\<大势力>\[<组>\]<子条目>.md   组成部分（front matter 写 `归属: <大势力>`）
@@ -248,6 +306,19 @@ def main() -> int:
         missing = [k for k in REQUIRED if not fm.get(k, "").strip()]
         if missing:
             errors.append(f"{rel}: 缺必填字段 {'、'.join(missing)}")
+
+        # 字段名分裂（2026-11-21 梳理时立的第 15 条）：一个概念只能有一个键名。
+        # 旧模板写「阵营」被 17 篇照抄、法宝模板写「别称」被 20 篇照抄，
+        # 结果同一件事有两种写法，检索和 Dataview 都只认其中一种。
+        for _bad, _good in (("阵营", "势力"), ("别称", "别名")):
+            if _bad in fm:
+                errors.append(
+                    f"{rel}: 用了旧键名「{_bad}」，全库统一写「{_good}」（硬规矩第 15 条）"
+                )
+        if str(fm.get("别名", "")).strip() and not str(fm.get("aliases", "")).strip():
+            errors.append(
+                f"{rel}: 有「别名」却没有「aliases」——Obsidian 检索读的是 aliases，两个键都要写"
+            )
 
         name = fm.get("词条", "").strip()
         # 允许「00-」这类排序前缀：文件名 00-地图变迁.md 对应 词条: 地图变迁
