@@ -218,6 +218,24 @@ def main() -> int:
             errors.append(f"{rel}: 缺头信息（文件必须以 --- 开头，并用 --- 收尾）")
             continue
 
+        # front matter 必须是合法 YAML：解析不了，Obsidian 整块属性都会显示「无效」。
+        # 典型成因是值以 [[ 开头却没加引号（如 法宝: [[覆地印]]（类型：印）），
+        # YAML 把它当嵌套序列，后面的中文说明就成了语法错误——而这种错在正则扫描里看不出来。
+        try:
+            import yaml as _yaml
+
+            try:
+                _yaml.safe_load(text.split("---", 2)[1])
+            except Exception as _e:  # noqa: BLE001
+                _first = [x for x in str(_e).splitlines() if x.strip()][:3]
+                errors.append(
+                    f"{rel}: 头信息不是合法 YAML（Obsidian 会判「无效属性」）："
+                    + " / ".join(_first)
+                    + " —— 值里带 [[链接]] 或中文说明时请整体加引号"
+                )
+        except ImportError:
+            pass
+
         # YAML 里以 * & ! 开头的裸值会被当成别名/锚点/标签，Obsidian 直接判「无效属性」
         for _ln in text.split("---", 2)[1].splitlines():
             _m = __import__("re").match(r"^([^\s:#][^:]*):\s(.*)$", _ln)
