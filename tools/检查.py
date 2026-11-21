@@ -55,6 +55,8 @@ LEVEL_LADDER = (
 # 人物必须带的字段（用户 2026-11-19 定）：外貌与外貌标签先占位，内容可空；
 # 三视角评价 + 1-3 个标签；法宝要带类型占位；功法/神通/亲近/仇视有就写、没有可空。
 ELEM_YES: list[str] = []
+CON_YES: list[str] = []
+CON_NO: list[str] = []
 EV_YES: list[str] = []
 EV_NO: list[str] = []
 GUIDE_YES: list[str] = []
@@ -85,6 +87,21 @@ SPACE_RANK = {name: i for i, name in enumerate(SPACE_LAYERS)}
 #   08 总览＝只做索引，不产生设定。
 CONCEPT_KINDS = ("本源", "法则", "度量", "势态", "认知", "人为", "位格", "术法", "总览")
 CONCEPT_RANK = {name: i for i, name in enumerate(CONCEPT_KINDS)}
+
+# 概念正文的九节（用户 2026-11-22 定）。门类「总览」是导航/编年页，不套九节——
+# 故事线、人间编年、未定稿问题都是索引，硬套会把编年表塞进「定义」里。
+CONCEPT_SECTIONS = (
+    "## 定义",
+    "## 本源/由来",
+    "## 核心特征",
+    "## 适用范围",
+    "## 类比/具象例子",
+    "## 和相近概念对比",
+    "## 作用/意义",
+    "## 局限与争议",
+    "## 简单总结",
+)
+CONCEPT_SECTIONS_EXEMPT = ("总览",)
 
 # 需要按档位分二级目录的类型：类型 -> (档位字段, 档位枚举)
 # 法宝按品阶、人物按境界、事件按元会、地理按空间层、概念按门类；其余类型仍是一层目录。
@@ -706,6 +723,21 @@ def main() -> int:
                 )
                 EV_NO.append(rel)
 
+        # 概念：正文必须写满九节（门类「总览」豁免——那三篇是导航/编年页）
+        if kind == "概念":
+            k = fm.get("门类", "").strip()
+            if k not in CONCEPT_SECTIONS_EXEMPT:
+                missing = [s for s in CONCEPT_SECTIONS if s not in body]
+                if missing:
+                    errors.append(
+                        f"{rel}: 概念正文缺 {len(missing)} 节（定义/本源由来/核心特征/"
+                        f"适用范围/类比与实例/相近概念对比/作用意义/局限与争议/简单总结）："
+                        + "、".join(s.lstrip("# ").strip() for s in missing)
+                    )
+                    CON_NO.append(rel)
+                else:
+                    CON_YES.append(rel)
+
         entries[path.stem] = (rel, fm)
 
         for raw in LINK_RE.findall(strip_code(body)):
@@ -797,6 +829,7 @@ def main() -> int:
     print(f"人物要素  已写 {len(ELEM_YES)} 篇 / 待补 {len(ELEM_NO)} 篇")
     print(f"可攻略性  可攻略 {len(GUIDE_YES)} 篇 / 不可攻略 {len(GUIDE_NO)} 篇")
     print(f"事件要素  已写 {len(EV_YES)} 篇 / 待补 {len(EV_NO)} 篇")
+    print(f"概念九节  已写 {len(CON_YES)} 篇 / 待补 {len(CON_NO)} 篇（门类「总览」豁免）")
     for kind_name, (field, allowed) in TIERS.items():
         counts = {}
         for _stem, (_rel, fm) in entries.items():
